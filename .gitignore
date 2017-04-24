@@ -15,9 +15,11 @@
 *.exe
 *.out
 *.app
+kernel
 
 # Log files
 *.log
+*.in
 
 #Binary files
 *.bin
