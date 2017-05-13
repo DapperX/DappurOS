@@ -1,5 +1,4 @@
 #include "multiboot.h"
-#include "stdarg.h"
 
 #define CNT_COLUMN (80)
 #define CNT_ROW (24)
@@ -22,16 +21,6 @@ void write_video(int pos,char c)
 
 void cls()
 {
-	int pos=2;
-	short int c=(0xc<<8)+'G';
-	__asm__ __volatile__(
-		"movw %1, %%gs:(%0)\n\t"
-	:
-	:
-		"r"(pos),"r"(c)
-	:
-		"memory"
-	);
 	for(int i=0;i<CNT_COLUMN*CNT_ROW*2;++i) write_video(i,0);
 
 	xpos=0,ypos=0;
@@ -76,44 +65,55 @@ void putchar(int c)
 	if(++xpos>=CNT_COLUMN) goto newline;
 }
 
-void printf(const char *format, ...)
+void print_int(const char *format, const int x)
 {
-	va_list arg;
+	char buf[30];
+	itoa (buf,'d', x);
+	for(char *p=buf;*p;++p) putchar (*p);
+}
+
+void printf (const char *format, ...)
+{
+	char *arg;
 	int c;
 	char buf[64];
 
-	va_start(arg,format);
-	while((c=*format++)!=0)
-	{
-		if(c!='%')
+	__builtin_va_start(arg,format);
+
+	while ((c = *format++) != 0)
 		{
-			putchar(c);
-			continue;
+			if (c != '%')
+				putchar (c);
+			else
+				{
+					char *p;
+
+					c = *format++;
+					switch (c)
+						{
+						case 'd':
+						case 'u':
+						case 'x':
+							itoa (buf, c, __builtin_va_arg(arg,int));
+							p = buf;
+							goto string;
+							break;
+
+						case 's':
+							p = __builtin_va_arg(arg,char*);
+							if (! p)
+								p = "(null)";
+
+						string:
+							while (*p)
+								putchar (*p++);
+							break;
+
+						default:
+							putchar (__builtin_va_arg(arg,int));
+							break;
+						}
+				}
 		}
-		char *p;
-		c=*format++;
-
-		switch(c)
-		{
-			case 'd':
-			case 'u':
-			case 'x':
-				itoa(buf,c,va_arg(arg,int));
-				p=buf;
-				goto string;
-				break;
-
-			case 's':
-				p=va_arg(arg,char*);
-				if(!p) p="(null)";
-			string:
-				while(*p) putchar(*p),p++;
-				break;
-
-			default:
-				putchar(va_arg(arg,int));
-				break;
-		}
-	}
-	va_end(arg);
+	__builtin_va_end(arg);
 }

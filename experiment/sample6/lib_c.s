@@ -17,6 +17,14 @@ write_video:
 	subl	$4, %esp
 	movl	12(%ebp), %eax
 	movb	%al, -4(%ebp)
+	movl	8(%ebp), %eax
+	movzbl	-4(%ebp), %edx
+#APP
+# 12 "lib.c" 1
+	movb %dl, %gs:(%eax)
+	
+# 0 "" 2
+#NO_APP
 	nop
 	leave
 	.cfi_restore 5
@@ -36,27 +44,17 @@ cls:
 	movl	%esp, %ebp
 	.cfi_def_cfa_register 5
 	subl	$16, %esp
-	movl	$2, -8(%ebp)
-	movw	$3143, -10(%ebp)
-	movl	-8(%ebp), %eax
-	movzwl	-10(%ebp), %edx
-#APP
-# 28 "lib.c" 1
-	movw %dx, %gs:(%eax)
-	
-# 0 "" 2
-#NO_APP
 	movl	$0, -4(%ebp)
-	jmp	.L4
-.L5:
+	jmp	.L3
+.L4:
 	pushl	$0
 	pushl	-4(%ebp)
 	call	write_video
 	addl	$8, %esp
 	addl	$1, -4(%ebp)
-.L4:
+.L3:
 	cmpl	$3839, -4(%ebp)
-	jle	.L5
+	jle	.L4
 	movl	$0, xpos
 	movl	$0, ypos
 	nop
@@ -85,9 +83,9 @@ itoa:
 	movl	%eax, -12(%ebp)
 	movl	$10, -16(%ebp)
 	cmpl	$100, 12(%ebp)
-	jne	.L7
+	jne	.L6
 	cmpl	$0, 16(%ebp)
-	jns	.L7
+	jns	.L6
 	movl	-8(%ebp), %eax
 	leal	1(%eax), %edx
 	movl	%edx, -8(%ebp)
@@ -96,12 +94,12 @@ itoa:
 	movl	16(%ebp), %eax
 	negl	%eax
 	movl	%eax, -12(%ebp)
-	jmp	.L8
-.L7:
+	jmp	.L7
+.L6:
 	cmpl	$120, 12(%ebp)
-	jne	.L8
+	jne	.L7
 	movl	$16, -16(%ebp)
-.L8:
+.L7:
 	movl	-16(%ebp), %ecx
 	movl	-12(%ebp), %eax
 	movl	$0, %edx
@@ -112,14 +110,14 @@ itoa:
 	leal	1(%eax), %edx
 	movl	%edx, -8(%ebp)
 	cmpl	$9, -28(%ebp)
-	jg	.L9
+	jg	.L8
 	movl	-28(%ebp), %edx
 	addl	$48, %edx
-	jmp	.L10
-.L9:
+	jmp	.L9
+.L8:
 	movl	-28(%ebp), %edx
 	addl	$87, %edx
-.L10:
+.L9:
 	movb	%dl, (%eax)
 	movl	-16(%ebp), %ecx
 	movl	-12(%ebp), %eax
@@ -127,14 +125,14 @@ itoa:
 	divl	%ecx
 	movl	%eax, -12(%ebp)
 	cmpl	$0, -12(%ebp)
-	jne	.L8
+	jne	.L7
 	movl	8(%ebp), %eax
 	movl	%eax, -20(%ebp)
 	movl	-8(%ebp), %eax
 	subl	$1, %eax
 	movl	%eax, -24(%ebp)
-	jmp	.L11
-.L12:
+	jmp	.L10
+.L11:
 	movl	-20(%ebp), %eax
 	movzbl	(%eax), %ebx
 	movl	-24(%ebp), %eax
@@ -145,10 +143,10 @@ itoa:
 	movb	%bl, (%eax)
 	addl	$1, -20(%ebp)
 	subl	$1, -24(%ebp)
-.L11:
+.L10:
 	movl	-20(%ebp), %eax
 	cmpl	-24(%ebp), %eax
-	jb	.L12
+	jb	.L11
 	movl	-8(%ebp), %eax
 	movb	$0, (%eax)
 	nop
@@ -173,23 +171,23 @@ putchar:
 	movl	%esp, %ebp
 	.cfi_def_cfa_register 5
 	cmpl	$10, 8(%ebp)
-	je	.L14
+	je	.L13
 	cmpl	$13, 8(%ebp)
-	jne	.L15
-	jmp	.L14
-.L19:
+	jne	.L14
+	jmp	.L13
+.L18:
 	nop
-.L14:
+.L13:
 	movl	$0, xpos
 	movl	ypos, %eax
 	addl	$1, %eax
 	movl	%eax, ypos
 	movl	ypos, %eax
 	cmpl	$23, %eax
-	jle	.L18
+	jle	.L17
 	movl	$0, ypos
-	jmp	.L18
-.L15:
+	jmp	.L17
+.L14:
 	movl	8(%ebp), %eax
 	movsbl	%al, %ecx
 	movl	ypos, %edx
@@ -224,11 +222,11 @@ putchar:
 	movl	%eax, xpos
 	movl	xpos, %eax
 	cmpl	$79, %eax
-	jg	.L19
-	jmp	.L13
-.L18:
+	jg	.L18
+	jmp	.L12
+.L17:
 	nop
-.L13:
+.L12:
 	leave
 	.cfi_restore 5
 	.cfi_def_cfa 4, 4
@@ -236,6 +234,47 @@ putchar:
 	.cfi_endproc
 .LFE3:
 	.size	putchar, .-putchar
+	.globl	print_int
+	.type	print_int, @function
+print_int:
+.LFB4:
+	.cfi_startproc
+	pushl	%ebp
+	.cfi_def_cfa_offset 8
+	.cfi_offset 5, -8
+	movl	%esp, %ebp
+	.cfi_def_cfa_register 5
+	subl	$48, %esp
+	pushl	12(%ebp)
+	pushl	$100
+	leal	-34(%ebp), %eax
+	pushl	%eax
+	call	itoa
+	addl	$12, %esp
+	leal	-34(%ebp), %eax
+	movl	%eax, -4(%ebp)
+	jmp	.L20
+.L21:
+	movl	-4(%ebp), %eax
+	movzbl	(%eax), %eax
+	movsbl	%al, %eax
+	pushl	%eax
+	call	putchar
+	addl	$4, %esp
+	addl	$1, -4(%ebp)
+.L20:
+	movl	-4(%ebp), %eax
+	movzbl	(%eax), %eax
+	testb	%al, %al
+	jne	.L21
+	nop
+	leave
+	.cfi_restore 5
+	.cfi_def_cfa 4, 4
+	ret
+	.cfi_endproc
+.LFE4:
+	.size	print_int, .-print_int
 	.section	.rodata
 .LC0:
 	.string	"(null)"
@@ -243,7 +282,7 @@ putchar:
 	.globl	printf
 	.type	printf, @function
 printf:
-.LFB4:
+.LFB5:
 	.cfi_startproc
 	pushl	%ebp
 	.cfi_def_cfa_offset 8
@@ -253,15 +292,15 @@ printf:
 	subl	$80, %esp
 	leal	12(%ebp), %eax
 	movl	%eax, -12(%ebp)
-	jmp	.L21
-.L30:
+	jmp	.L23
+.L32:
 	cmpl	$37, -8(%ebp)
-	je	.L22
+	je	.L24
 	pushl	-8(%ebp)
 	call	putchar
 	addl	$4, %esp
-	jmp	.L21
-.L22:
+	jmp	.L23
+.L24:
 	movl	8(%ebp), %eax
 	leal	1(%eax), %edx
 	movl	%edx, 8(%ebp)
@@ -270,18 +309,18 @@ printf:
 	movl	%eax, -8(%ebp)
 	movl	-8(%ebp), %eax
 	cmpl	$115, %eax
-	je	.L24
+	je	.L26
 	cmpl	$115, %eax
-	jg	.L25
+	jg	.L27
 	cmpl	$100, %eax
-	je	.L26
-	jmp	.L23
-.L25:
+	je	.L28
+	jmp	.L25
+.L27:
 	cmpl	$117, %eax
-	je	.L26
+	je	.L28
 	cmpl	$120, %eax
-	jne	.L23
-.L26:
+	jne	.L25
+.L28:
 	movl	-12(%ebp), %eax
 	leal	4(%eax), %edx
 	movl	%edx, -12(%ebp)
@@ -294,33 +333,46 @@ printf:
 	addl	$12, %esp
 	leal	-76(%ebp), %eax
 	movl	%eax, -4(%ebp)
-	jmp	.L27
-.L24:
+	jmp	.L29
+.L26:
+#APP
+# 103 "lib.c" 1
+	nop
+	
+# 0 "" 2
+#NO_APP
 	movl	-12(%ebp), %eax
 	leal	4(%eax), %edx
 	movl	%edx, -12(%ebp)
 	movl	(%eax), %eax
 	movl	%eax, -4(%ebp)
+#APP
+# 105 "lib.c" 1
+	nop
+	
+# 0 "" 2
+#NO_APP
 	cmpl	$0, -4(%ebp)
-	jne	.L28
+	jne	.L30
 	movl	$.LC0, -4(%ebp)
-.L27:
-	jmp	.L28
 .L29:
+	jmp	.L30
+.L31:
 	movl	-4(%ebp), %eax
+	leal	1(%eax), %edx
+	movl	%edx, -4(%ebp)
 	movzbl	(%eax), %eax
 	movsbl	%al, %eax
 	pushl	%eax
 	call	putchar
 	addl	$4, %esp
-	addl	$1, -4(%ebp)
-.L28:
+.L30:
 	movl	-4(%ebp), %eax
 	movzbl	(%eax), %eax
 	testb	%al, %al
-	jne	.L29
-	jmp	.L21
-.L23:
+	jne	.L31
+	jmp	.L23
+.L25:
 	movl	-12(%ebp), %eax
 	leal	4(%eax), %edx
 	movl	%edx, -12(%ebp)
@@ -329,7 +381,7 @@ printf:
 	call	putchar
 	addl	$4, %esp
 	nop
-.L21:
+.L23:
 	movl	8(%ebp), %eax
 	leal	1(%eax), %edx
 	movl	%edx, 8(%ebp)
@@ -337,14 +389,14 @@ printf:
 	movsbl	%al, %eax
 	movl	%eax, -8(%ebp)
 	cmpl	$0, -8(%ebp)
-	jne	.L30
+	jne	.L32
 	nop
 	leave
 	.cfi_restore 5
 	.cfi_def_cfa 4, 4
 	ret
 	.cfi_endproc
-.LFE4:
+.LFE5:
 	.size	printf, .-printf
 	.ident	"GCC: (Ubuntu 5.4.0-6ubuntu1~16.04.4) 5.4.0 20160609"
 	.section	.note.GNU-stack,"",@progbits
