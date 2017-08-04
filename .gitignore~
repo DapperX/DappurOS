@@ -24,3 +24,7 @@ kernel
 #Binary files
 *.bin
 *.img
+
+#Swap files
+*.swp
+*.swo

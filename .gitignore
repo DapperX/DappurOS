@@ -15,7 +15,6 @@
 *.exe
 *.out
 *.app
-kernel
 
 # Log files
 *.log
@@ -24,7 +23,11 @@ kernel
 #Binary files
 *.bin
 *.img
+*/bin/*
 
 #Swap files
 *.swp
 *.swo
+
+#Dependence files
+*.d
