@@ -30,8 +30,9 @@ lib :
 $(MOD):
 	$(MAKE) -C $@
 
-clean : 
+clean :
 	-rm $(DIR_BIN)/*
 
+T = a.c b.asm c.h
 test:
-	echo $@
+	echo $(patsubst %,%.o,$(basename $(T)))

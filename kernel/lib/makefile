@@ -1,6 +1,6 @@
 CC := gcc
-SRC = $(wildcard *.c)
-OBJ = $(SRC:%.c=%.o)
+SRC = $(wildcard *.c) $(wildcard *.asm)
+OBJ = $(patsubst %,%.o,$(basename $(SRC)))
 CFLAG += $(DIR_INCLUDE:%=-I%)
 
 
@@ -8,8 +8,11 @@ CFLAG += $(DIR_INCLUDE:%=-I%)
 
 build : libDPOS_main.a
 
+%.o : %.c ;$(CC) $< $(CFLAG) -c -o $@
+%.o : %.asm ;$(ASM) $< $(ASMFLAG) -o $@
+
 %.d : %.c
-	$(CC) $< $(DIR_INCLUDE:%=-I%) -MM | sed 's/\(.*\)[^\]$$/\0\n\t$$(CC) $$< $$(CFLAG) -c -o $$@/g' > $@
+	$(CC) $< $(DIR_INCLUDE:%=-I%) -MM > $@
 
 sinclude $(SRC:.c=.d)
 
