@@ -12,10 +12,6 @@
 ;参数：描述符地址，新的基址
 ;注意：本宏会修改eax的值
 %macro DESCRIPOR_SET_BASE 2
-	;xor	eax, eax
-	;mov	ax, cs
-	;shl	eax, 4
-	;add	eax, (%2)
 	mov	eax, (%2)
 	mov	[(%1) + 2], ax
 	shr	eax, 16

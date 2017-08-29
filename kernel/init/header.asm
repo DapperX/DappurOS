@@ -11,7 +11,12 @@ header_start:
 	;checksum
 	dd 0x100000000 - (MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_ARCH_I386 + (header_end - header_start))
 
-	;insert optional multiboot tags here
+	;Multiboot information request
+	dw 0x1
+	dw 0x0
+	dd 16
+	dd 3
+	dd 6
 
 	;required end tag
 	dw 0	; type

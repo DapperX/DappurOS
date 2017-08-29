@@ -1,14 +1,12 @@
-#define CNT_COLUMN (80)
-#define CNT_ROW (24)
+#ifndef HEADER_BASE
+#define HEADER_BASE
 
-#define COLOR_WB (0x07)
+#define NULL ((void*)0)
 
+typedef unsigned char byte;
+typedef unsigned short int ushort;
 typedef unsigned int uint;
+typedef long long int lli;
+typedef unsigned long long int ull;
 
-
-void write_video(int pos,char c,char color);
-void kcls();
-void kputchar(int c);
-void kputs(char *s);
-void kprintf(const char *format,...);
-void kprint_int(const int x);
+#endif //HEADER_BASE

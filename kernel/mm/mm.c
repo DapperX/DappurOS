@@ -1,14 +1,52 @@
-void printf(const char*,...);
-void print_int(const char*,int);
-void putchar(int c);
-void cls();
+/*#include "base.h"
 
-void os_start(int eax,int ebx)
+static int var_global;
+static int var_global_init=1;
+
+static void mm_start()
 {
-	int pos=0;
-	//cls();
-	printf("OS starts running...\n");
-	printf("eax: %d\n",eax);
-	printf("ebx: %d\n%s\n",ebx,"test_text");
-	print_int("addr: %d\n",(int)&eax);
+	//kputs("mm has been loaded");
+	__asm__ __volatile__(
+		"movb %1, %%gs:(%0)\n\t"
+		"movb %2, %%gs:1(%0)\n\t"
+	:
+	:
+		"r"((80*1+64)*2),"r"((char)'M'),"r"((char)0x0C)
+	:
+		"memory"
+	);
+}*/
+char *s="Success\n";
+
+void print()
+{
+	__asm__ __volatile__(
+		"movb %1, %%gs:(%0)\n\t"
+		"movb %2, %%gs:1(%0)\n\t"
+	:
+	:
+		"r"((80*1+64)*2),"r"((char)'M'),"r"((char)0x0C)
+	:
+		"memory"
+	);
+}
+
+void exit_module()
+{
+	__asm__ __volatile__(
+		"movb %1, %%gs:(%0)\n\t"
+		"movb %2, %%gs:1(%0)\n\t"
+		"hlt\n\t"
+	:
+	:
+		"r"((80*1+65)*2),"r"((char)'E'),"r"((char)0x0C)
+	:
+		"memory"
+	);
+}
+
+void init_module()
+{
+	print();
+	exit_module();
 }

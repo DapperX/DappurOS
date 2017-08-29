@@ -1,7 +1,15 @@
 ENTRY(_start)
 
 SECTIONS {
-	.data 0x500 :
+	.bss 0x500 :
+	{
+		*(.bss)
+	}
+	.rodata :
+	{
+		*(.rodata)
+	}
+	.data :
 	{
 		*(.data)
 	}
@@ -36,5 +44,9 @@ SECTIONS {
 	LDT 0x2018A0 :
 	{
 		*(LDT)
+	}
+	/DISCARD/ :
+	{
+		*(.eh_frame .comment)
 	}
 }

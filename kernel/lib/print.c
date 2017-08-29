@@ -1,7 +1,8 @@
-#include "base.h"
+#include "print.h"
 
-static int xpos;
-static int ypos;
+static int xpos=0;
+static int ypos=0;
+static int offset_column=0;
 
 inline void write_video(int pos,char c,char color)
 {
@@ -20,7 +21,7 @@ void kcls()
 {
 	for(int i=0;i<CNT_COLUMN*CNT_ROW*2;++i) write_video(i,0,COLOR_WB);
 
-	xpos=0,ypos=0;
+	xpos=0,ypos=0,offset_column=0;
 }
 
 static void itoa(char *s,int base,int d)
@@ -58,20 +59,25 @@ void kputchar(int c)
 	if(c=='\n'||c=='\r') newline=1;
 	if(!newline)
 	{
-		write_video((ypos+xpos*CNT_COLUMN)*2,(char)c,COLOR_WB);
-		if(++ypos>=CNT_COLUMN) newline=1;
+		write_video((ypos+offset_column+xpos*CNT_COLUMN)*2,(char)c,COLOR_WB);
+		if(++ypos>=CNT_COLUMN/2-1) newline=1;
 	}
 	if(newline)
 	{
 		ypos=0;
-		if(++xpos>=CNT_ROW) xpos=0;
+		if(++xpos>=CNT_ROW) xpos=0,offset_column=CNT_COLUMN/2-offset_column;
 	}
+}
+
+void kputs_nonewline(char *s)
+{
+	if(!s) s="(null)";
+	while(*s) kputchar(*s++);
 }
 
 void kputs(char *s)
 {
-	if(!s) s="(null)";
-	while(*s) kputchar(*s++);
+	kputs_nonewline(s);
 	kputchar('\n');
 }
 
@@ -110,11 +116,11 @@ void kprintf(const char *format,...)
 			case 'x':
 			case 'p':
 				itoa(s,c, __builtin_va_arg(arg,int));
-				kputs(s);
+				kputs_nonewline(s);
 				break;
 
 			case 's':
-				kputs(__builtin_va_arg(arg,char*));
+				kputs_nonewline(__builtin_va_arg(arg,char*));
 				break;
 
 			default:

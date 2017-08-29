@@ -3,7 +3,7 @@ export LD = ld
 export CC = gcc
 export ASMFLAG = -f elf
 export LDFLAG = $(DIR_LIB:%=-L%) $(LIB:%=-l%)
-export CFLAG = -g -Wall -Wextra -Wconversion -fno-builtin -fno-stack-protector
+export CFLAG = -Wall -Wextra -Wconversion -fno-builtin -fno-stack-protector -fno-asynchronous-unwind-tables
 
 export DIR_MAIN = $(shell pwd)
 export DIR_BIN = $(DIR_MAIN)/bin
