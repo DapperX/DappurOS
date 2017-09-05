@@ -2,10 +2,15 @@
 %include "macro.inc"
 
 
+[SECTION PDE_kernel]
+%rep 1024
+	dd 0
+%endrep
+
 [SECTION IDT]
 ALIGN	32
 IdtBegin:
-%rep 255
+%rep 256
 	GATE_MAKE	0, 0, 0, DA_386IGate
 %endrep
 
@@ -57,57 +62,42 @@ SEL_LDT_DATA_USER	equ	LdtUserData - LdtBegin + SA_TIL
 
 
 STACK_TOP_TEMP	equ 0x7c00
-extern init_c_start
+extern init_memory
 
 [SECTION start]
-global _start
+global module_start
 
-_start:
+module_start:
 	lgdt [GdtPtr]
-	jmp SEL_GDT_CODE_KERNEL:Main
+	jmp SEL_GDT_CODE_KERNEL:init_register
 ;end of [SECTION start]
 
 [SECTION .text]
-Main:
+init_register:
 	mov edx, eax
 
 	;init video
 	mov ax, SEL_GDT_VIDEO
 	mov gs, ax
 
-	mov	ch, 0Ch
-	mov	cl, 'D'
-	mov	[gs:((80 * 0 + 64) * 2)], cx
 	;init data seg
 	mov ax, SEL_GDT_DATA_KERNEL
 	mov ds, ax
 
-	mov	ch, 0Ch
-	mov	cl, 'S'
-	mov	[gs:((80 * 0 + 65) * 2)], cx
 	;init stack
 	mov	ss, ax
 	mov esp, STACK_TOP_TEMP
 	mov ebp, esp
 
-	mov	ch, 0Ch
-	mov	cl, 'L'
-	mov	[gs:((80 * 0 + 66) * 2)], cx
 	DESCRIPOR_SET_BASE	GdtLdt, LdtBegin
 	mov ax, SEL_GDT_LDT
 	lldt ax
 
-	mov	ch, 0Ch
-	mov	cl, 'I'
-	mov	[gs:((80 * 0 + 67) * 2)], cx
 	lidt [IdtPtr]
 
 	push ebx
 	push edx
-
-	mov	ch, 0Ch
-	mov	cl, 'K'
-	mov	[gs:((80 * 0 + 68) * 2)], cx
-	call init_c_start
-
+	call init_memory
+	; `init_memory` should never return, or the startup has failed
+	; if so, halt 
 	hlt

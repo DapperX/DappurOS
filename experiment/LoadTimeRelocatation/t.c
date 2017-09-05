@@ -3,6 +3,7 @@
 #define LEN_S (8)
 
 char *s="Success\n";
+int g_uninit;
 
 void print()
 {
@@ -10,7 +11,7 @@ void print()
 		"int $0x80\n\t"
 	:
 	:
-		"a"(SYS_WRITE),"b"(STDOUT),"c"(s),"d"(LEN_S)
+		"a"(SYS_WRITE),"b"(g_uninit),"c"(s),"d"(LEN_S)
 	:
 	);
 }

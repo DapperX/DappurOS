@@ -1,10 +1,10 @@
-#ifndef HEADER_MEMORY
-#define HEADER_MEMORY
+#ifndef _MEMORY_H
+#define _MEMORY_H
 
 
 #include "base.h"
 
-void* kmemset(const void *dest,byte val,uint size);
-void* kmemcpy(const void *dest,void *src,uint size);
+void* kmemset(void *dest,byte val,uint size);
+void* kmemcpy(void *dest,const void *src,uint size);
 
-#endif //HEADER_MEMORY
+#endif //_MEMORY_H

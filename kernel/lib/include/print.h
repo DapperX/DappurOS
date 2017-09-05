@@ -1,5 +1,5 @@
-#ifndef HEADER_PRINT
-#define HEADER_PRINT
+#ifndef _PRINT_H
+#define _PRINT_H
 
 
 #include "base.h"
@@ -17,4 +17,4 @@ void kputs(char *s);
 void kprintf(const char *format,...);
 void kprint_int(const int x);
 
-#endif //HEADER_PRINT
+#endif //_PRINT_H

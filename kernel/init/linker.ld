@@ -1,4 +1,4 @@
-ENTRY(_start)
+ENTRY(module_start)
 
 SECTIONS {
 	.bss 0x500 :
@@ -37,11 +37,11 @@ SECTIONS {
 	{
 		*(IDT)
 	}
-	GDT 0x201800 :
+	GDT 0x201820 :
 	{
 		*(GDT)
 	}
-	LDT 0x2018A0 :
+	LDT 0x2018C0 :
 	{
 		*(LDT)
 	}
