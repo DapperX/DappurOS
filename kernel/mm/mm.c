@@ -1,61 +1,36 @@
-#include "base.h"
-/*
-static int var_global;
-static int var_global_init=1;
+#include "mm.h"
 
-static void mm_start()
-{
-	//kputs("mm has been loaded");
-	__asm__ __volatile__(
-		"movb %1, %%gs:(%0)\n\t"
-		"movb %2, %%gs:1(%0)\n\t"
-	:
-	:
-		"r"((80*1+64)*2),"r"((char)'M'),"r"((char)0x0C)
-	:
-		"memory"
-	);
-}*/
-char *s="Success\n";
+uint *const pageDirectory=(uint*)(OFFSET_HIGH_MEMORY+ADDR_PAGE_DIRECTORY);
+uint **const reversePageTable=(uint**)(OFFSET_HIGH_MEMORY+ADDR_REVERSE_PAGE_TABLE);
+kernelCall *const kernelCallTable=(kernelCall*)(OFFSET_HIGH_MEMORY+ADDR_KERNEL_CALL_TABLE);
 
-void print()
+int_var module_init()
 {
-	__asm__ __volatile__(
-		"movb %1, %%gs:(%0)\n\t"
-		"movb %2, %%gs:1(%0)\n\t"
-	:
-	:
-		"r"((80*1+64)*2),"r"((char)'M'),"r"((char)0x0C)
-	:
-		"memory"
-	);
+	// cancel pageTable_temp
+	uint *const pageDirectory=(uint*)ADDR_PAGE_DIRECTORY;
+	for(register uint i=0;i<(ADDR_HIGH_MEMORY>>22);++i)
+		pageDirectory[i]=0;
 }
 
-void exit_module()
+int_var module_exit()
 {
-	__asm__ __volatile__(
-		"movb %1, %%gs:(%0)\n\t"
-		"movb %2, %%gs:1(%0)\n\t"
-		"hlt\n\t"
-	:
-	:
-		"r"((80*1+65)*2),"r"((char)'E'),"r"((char)0x0C)
-	:
-		"memory"
-	);
 }
 
-void init_module()
+int_var alloc_page()
 {
-	print();
-	exit_module();
 }
 
-int module_kernelCall(uint index, ...)
-{
-	init_module();
-	return 0;
+int_var free_page()
+{	
 }
 
-uint module_kernelCall_index=0;
-int (*module_kernelCall_entry)(uint index, ...)=module_kernelCall;
+int_var module_kernelCall(uint index,...)
+{
+	static kernelCall callList[]={
+		[0]=module_init,
+		[1]=module_exit,
+	};
+	kassert(index>=KERNEL_CALL_SELF_DEFINED+LEN_ARRAY(callList));
+	kassert(callList[index]);
+	TEMPLATE_CALL_DISTRIBUTE(callList);
+}

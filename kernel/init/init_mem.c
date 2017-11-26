@@ -88,7 +88,7 @@ void* get_page_free(const uint cnt,const uint is_writable)
 		uint *addr_PDE=&pageTable_temp[size_reserveMemory>>12];
 		pageDirectory[size_reserveMemory>>22]=(uint)&pageTable_temp[(size_reserveMemory>>22)*1024]|PDE_P|PDE_R;
 		(*addr_PDE)=size_reserveMemory|PDE_P|is_writable;
-		reversePageTable[size_reserveMemory>>12]=(uint*)(((uint)addr_PDE-OFFSET_KERNEL_LOW_MEMORY+ADDR_HIGH_MEMORY)|RPE_U);
+		reversePageTable[size_reserveMemory>>12]=(uint*)(((uint)addr_PDE-OFFSET_KERNEL_LOW_MEMORY+OFFSET_HIGH_MEMORY)|RPE_U);
 		size_reserveMemory+=(1<<12);
 	}
 	return (void*)base;
@@ -178,7 +178,7 @@ void elf_relocate(byte *const buffer)
 			}
 
 			if((reltab[j].r_info&0xff)==R_386_32) // absolute location
-				*(int*)(section_dist+offset)+=(uint)(addr_section_sym+symbol->st_value)-OFFSET_KERNEL_LOW_MEMORY+ADDR_HIGH_MEMORY;
+				*(int*)(section_dist+offset)+=(uint)(addr_section_sym+symbol->st_value)-OFFSET_KERNEL_LOW_MEMORY+OFFSET_HIGH_MEMORY;
 			else // relative location(R_386_PC32)
 				*(int*)(section_dist+offset)+=(int)((uint)(addr_section_sym+symbol->st_value)-(uint)(addr_section_dist+offset));
 		}
@@ -263,8 +263,8 @@ void init_pageDirectory()
 	// important! it needs to align to 2**22(4MB)
 	for(register uint i=0;i<align(size_reserveMemory,22)>>22;++i)
 		pageDirectory[i]=(uint)&pageTable_temp[i*1024]|PDE_P|PDE_R;
-	for(register uint i=(ADDR_HIGH_MEMORY>>22);i<cnt_pageDirectory;++i)
-		pageDirectory[i]=(uint)&pageTable_kernel[(i-(ADDR_HIGH_MEMORY>>22))*1024]|PDE_P|PDE_R;
+	for(register uint i=(OFFSET_HIGH_MEMORY>>22);i<cnt_pageDirectory;++i)
+		pageDirectory[i]=(uint)&pageTable_kernel[(i-(OFFSET_HIGH_MEMORY>>22))*1024]|PDE_P|PDE_R;
 }
 
 
@@ -281,12 +281,12 @@ void init_pageTable_temp()
 void init_pageTable_kernel()
 {
 	// i is the high 20bit of kernel address space
-	for(register uint i=(ADDR_HIGH_MEMORY>>12);i<(1<<20);++i)
-		pageTable_kernel[i-(ADDR_HIGH_MEMORY>>12)]=0;
+	for(register uint i=(OFFSET_HIGH_MEMORY>>12);i<(1<<20);++i)
+		pageTable_kernel[i-(OFFSET_HIGH_MEMORY>>12)]=0;
 	// i is the high 20bit of reserve memory
 	for(register uint i=(OFFSET_KERNEL_LOW_MEMORY>>12);i<(size_reserveMemory>>12);++i)
 	{
-		// ADDR_HIGH_MEMORY:ADDR_HIGH_MEMORY+size_reserveMemory-1MB -> 1MB:size_reserveMemory
+		// OFFSET_HIGH_MEMORY:OFFSET_HIGH_MEMORY+size_reserveMemory-1MB -> 1MB:size_reserveMemory
 		pageTable_kernel[i-(OFFSET_KERNEL_LOW_MEMORY>>12)]=pageTable_temp[i];
 	}
 }

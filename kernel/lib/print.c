@@ -6,9 +6,9 @@ static int offset_column=0;
 
 inline void write_video(int pos,char c,char color)
 {
-	__asm__ __volatile__(
-		"movb %1, %%gs:(%0)\n\t"
-		"movb %2, %%gs:1(%0)\n\t"
+	asm volatile(
+		"movb	%1, %%gs:(%0)\n\t"
+		"movb	%2, %%gs:1(%0)\n\t"
 	:
 	:
 		"r"(pos),"r"(c),"r"(color)
