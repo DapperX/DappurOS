@@ -10,7 +10,7 @@ bool cmp_default_int(void *x,void *y);
 bool cmp_default_unsigned(void *x,void *y);
 bool cmp_default_pointer(void *x,void *y);
 
-void kswap(void *x,void *y,uint size);
-void ksort(void *begin,void *end,uint size_element,bool (*cmp)(void*,void*));
+void kswap(void *x,void *y,u32 size);
+void ksort(void *begin,void *end,u32 size_element,bool (*cmp)(void*,void*));
 
 #endif // _ALGORITHM_H

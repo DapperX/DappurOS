@@ -43,7 +43,7 @@ struct ext2_superBlock{
 	u16 padding;
 	
 	u32 reserve[190];
-}
+};
 
 
 struct ext2_group_descriptor{
@@ -55,7 +55,7 @@ struct ext2_group_descriptor{
 	le16 cnt_dir_used;
 	le16 pad;
 	le32 reserve[3];
-}
+};
 
 
 struct ext2_inode{
@@ -70,7 +70,7 @@ struct ext2_inode{
 	le16 cnt_link;
 	le32 cnt_block;//file length, block
 	le32 flag;
-}
+};
 
 
 struct ext2_dir{
@@ -79,4 +79,4 @@ struct ext2_dir{
 	u8 len_name;
 	u8 type;
 	char name[EXT2_MAX_LEN_NAME];
-}
+};

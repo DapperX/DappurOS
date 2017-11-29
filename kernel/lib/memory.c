@@ -1,6 +1,6 @@
 #include "memory.h"
 
-void* kmemset(void *dest,byte val,uint size)
+void* kmemset(void *dest,byte val,u32 size)
 {
 	register byte *p=(byte*)dest;
 	register byte *end=(byte*)dest+size;
@@ -8,7 +8,7 @@ void* kmemset(void *dest,byte val,uint size)
 	return dest;
 }
 
-void* kmemcpy(void *dest,const void *src,uint size)
+void* kmemcpy(void *dest,const void *src,u32 size)
 {
 	register byte *p=(byte*)dest;
 	register const byte *t=(const byte*)src;

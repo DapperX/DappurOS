@@ -3,7 +3,7 @@ ASMFLAG += $(DIR_INCLUDE:%=-i%/)
 CFLAG += $(DIR_INCLUDE:%=-I%)
 DEPEND += $(PATH_LIB)
 
-$(DIR_BIN)/mm : $(DEPEND) $(OBJ) linker.ld
+$(DIR_BIN)/mm.mod : $(DEPEND) $(OBJ) linker.ld
 	$(LD) $^ $(LDFLAG) -r -Tlinker.ld -o $@
 
 %.o : %.c ;$(CC) $< $(CFLAG) -c -o $@

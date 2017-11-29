@@ -10,11 +10,11 @@
 #define COLOR_WB (0x07)
 
 
-void write_video(int pos,char c,char color);
+void write_video(i32 pos,char c,char color);
 void kcls();
-void kputchar(int c);
+void kputchar(i32 c);
 void kputs(char *s);
 void kprintf(const char *format,...);
-void kprint_int(const int x);
+void kprint_int(const i32 x);
 
 #endif //_PRINT_H

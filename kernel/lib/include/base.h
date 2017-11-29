@@ -1,7 +1,9 @@
 #ifndef _BASE_H
 #define _BASE_H
 
+#ifndef NULL
 #define NULL ((void*)0)
+#endif
 #define STR(s) STR_(s)
 #define STR_(s) #s
 

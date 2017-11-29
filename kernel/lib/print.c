@@ -1,10 +1,10 @@
 #include "print.h"
 
-static int xpos=0;
-static int ypos=0;
-static int offset_column=0;
+static i32 xpos=0;
+static i32 ypos=0;
+static i32 offset_column=0;
 
-inline void write_video(int pos,char c,char color)
+inline void write_video(i32 pos,char c,char color)
 {
 	asm volatile(
 		"movb	%1, %%gs:(%0)\n\t"
@@ -19,16 +19,16 @@ inline void write_video(int pos,char c,char color)
 
 void kcls()
 {
-	for(int i=0;i<CNT_COLUMN*CNT_ROW*2;++i) write_video(i,0,COLOR_WB);
+	for(i32 i=0;i<CNT_COLUMN*CNT_ROW*2;++i) write_video(i,0,COLOR_WB);
 
 	xpos=0,ypos=0,offset_column=0;
 }
 
-static void itoa(char *s,int base,int d)
+static void itoa(char *s,i32 base,i32 d)
 {
 	char *p=s;
-	uint ud=(uint)d;
-	uint divisor=10;
+	u32 ud=(u32)d;
+	u32 divisor=10u;
 
 	switch(base)
 	{
@@ -37,10 +37,10 @@ static void itoa(char *s,int base,int d)
 		case 'p':p[0]='0',p[1]='x',p+=2,s+=2;
 		case 'x':divisor=16;break;
 	}
-	if(base=='d' && d<0) *(p++)='-',s++,ud=(uint)-d;
+	if(base=='d' && d<0) *(p++)='-',s++,ud=(u32)-d;
 
 	do{
-		uint r=ud%divisor;
+		u32 r=ud%divisor;
 		*(p++)=(char)((r<10)?(r+'0'):(r+'a'-10));
 	}while(ud/=divisor);
 
@@ -53,9 +53,9 @@ static void itoa(char *s,int base,int d)
 	*p='\0';
 }
 
-void kputchar(int c)
+void kputchar(i32 c)
 {
-	int newline=0;
+	i32 newline=0;
 	if(c=='\n'||c=='\r') newline=1;
 	if(!newline)
 	{
@@ -81,7 +81,7 @@ void kputs(char *s)
 	kputchar('\n');
 }
 
-void kprint_int(const int x)
+void kprint_int(const i32 x)
 {
 	char s[12];
 	itoa(s,'d',x);
@@ -91,7 +91,7 @@ void kprint_int(const int x)
 void kprintf(const char *format,...)
 {
 	char *arg;
-	int c;
+	i32 c;
 	char s[64];
 
 	__builtin_va_start(arg,format);
@@ -115,7 +115,7 @@ void kprintf(const char *format,...)
 			case 'u':
 			case 'x':
 			case 'p':
-				itoa(s,c, __builtin_va_arg(arg,int));
+				itoa(s,c, __builtin_va_arg(arg,i32));
 				kputs_nonewline(s);
 				break;
 
@@ -124,7 +124,7 @@ void kprintf(const char *format,...)
 				break;
 
 			default:
-				kputchar(__builtin_va_arg(arg,int));
+				kputchar(__builtin_va_arg(arg,i32));
 				break;
 		}
 	}

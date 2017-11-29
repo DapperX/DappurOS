@@ -13,26 +13,24 @@ export DIR_IMG = /mnt
 export LIB = DPOS_main
 export PATH_LIB = $(patsubst %,$(DIR_LIB)/%,$(LIB:%=lib%.a))
 
-MOD_EXCLUDE = bin init include lib tool
+BIN_EXT = init
+MOD_EXCLUDE = $(BIN_EXT) bin include lib tool test
 MOD = $(filter-out $(MOD_EXCLUDE),$(patsubst ./%,%,$(shell find . -mindepth 1 -maxdepth 1 -type d)))
-OBJ = $(MOD:%=%.o)
-BIN = lib init $(MOD)
 
-.PHONY : $(BIN) build run clean test mount umount copy bochs newmodule
+.PHONY : $(BIN_EXT) $(MOD) build run clean mount umount copy bochs newmodule lib test
 
 run : build mount copy umount bochs
 
-build : $(BIN)
+build : $(BIN_EXT) $(MOD)
 
-$(BIN):
+$(BIN_EXT) $(MOD) test : lib
+
+$(BIN_EXT) $(MOD) test lib :
 	$(MAKE) -C $@
 
-copy : $(patsubst %,$(DIR_IMG)/%,init $(MOD:%=%.mod))
+copy : $(patsubst %,$(DIR_IMG)/%,$(BIN_EXT) $(MOD:%=%.mod))
 
-$(DIR_IMG)/init : $(DIR_BIN)/init
-	sudo cp $^ $@
-
-$(DIR_IMG)/%.mod : $(DIR_BIN)/%
+$(DIR_IMG)/% : $(DIR_BIN)/%
 	sudo cp $^ $@
 
 mount :
@@ -50,6 +48,3 @@ newmodule :
 
 clean :
 	-rm $(DIR_BIN)/*
-
-#test: build
-#	python3 test/main.py

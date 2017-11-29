@@ -1,4 +1,4 @@
-#trashbin
+# Trashbin
 trashbin
 
 # Object files
@@ -18,19 +18,25 @@ trashbin
 *.exe
 *.out
 *.app
+*.test
 
 # Log files
 *.log
 *.in
 
-#Binary files
+# Binary files
 *.bin
 *.img
 */bin/*
+*.mod
 
-#Swap files
+# Swap files
 *.swp
 *.swo
 
-#Dependence files
+# Dependence files
 *.d
+
+# Backup files
+*.bak
+*~
