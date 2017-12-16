@@ -1,7 +1,7 @@
 CC := gcc
 SRC = $(wildcard *.c) $(wildcard *.asm)
 OBJ = $(patsubst %,%.o,$(basename $(SRC)))
-DIR_INCLUDE += $(DIR_MAIN)/fs/ext2
+DIR_INCLUDE = $(DIR_MAIN)/include $(DIR_MAIN)/fs/ext2
 CFLAG += -Werror $(DIR_INCLUDE:%=-I%)
 
 
@@ -16,7 +16,7 @@ build : testExt2.test
 %.o : %.asm ;$(ASM) $< $(ASMFLAG) -o $@
 
 %.d : %.c
-	$(CC) $< $(DIR_INCLUDE:%=-I%) -MM > $@
+	@$(CC) $< $(CFLAG) -MM > $@
 
 sinclude $(SRC:.c=.d)
 
