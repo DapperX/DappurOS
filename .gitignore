@@ -1,3 +1,8 @@
+# Experiment binary files
+experiment/*/*
+!experiment/*/*.*
+!experiment/*/bochsrc
+
 # Trashbin
 trashbin
 

@@ -19,13 +19,24 @@
 #ifndef _ELF_H
 #define	_ELF_H 1
 
-#include <features.h>
+//#include <features.h>
 
-__BEGIN_DECLS
+//__BEGIN_DECLS
 
 /* Standard ELF types.  */
 
-#include <stdint.h>
+//#include <stdint.h>
+
+// type compatibility
+
+#include "base.h"
+
+#define int16_t i16
+#define uint16_t u16
+#define int32_t i32
+#define uint32_t u32
+#define int64_t i64
+#define uint64_t u64
 
 /* Type for a 16-bit quantity.  */
 typedef uint16_t Elf32_Half;
@@ -998,7 +1009,7 @@ typedef struct
     } a_un;
 } Elf64_auxv_t;
 
-#include <bits/auxv.h>
+//#include <bits/auxv.h>
 /* Note section contents.  Each entry in the note section begins with
    a header of a fixed form.  */
 
@@ -3498,6 +3509,13 @@ enum
 #define R_TILEGX_NUM		130
 
 
-__END_DECLS
+//__END_DECLS
+
+#undef int16_t
+#undef uint16_t
+#undef int32_t
+#undef uint32_t
+#undef int64_t
+#undef uint64_t
 
 #endif	/* elf.h */

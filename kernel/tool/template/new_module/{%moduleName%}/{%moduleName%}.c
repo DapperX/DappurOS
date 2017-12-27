@@ -1,6 +1,7 @@
 #include "{%moduleName%}.h"
+#include "assert.h"
 
-kernelCall *const kernelCallTable=(kernelCall*)(ADDR_KERNEL_CALL_TABLE+ADDR_HIGH_MEMORY);
+kernelCall *const kernelCallTable=(kernelCall*)(ADDR_KERNEL_CALL_TABLE+OFFSET_HIGH_MEMORY);
 
 int_var module_init()
 {
@@ -10,13 +11,13 @@ int_var module_exit()
 {
 }
 
-int_var module_kernelCall(uint index,...)
+int_var module_kernelCall(u32 index,...)
 {
 	static kernelCall callList[]={
-		[0]=module_init,
-		[1]=module_exit,
+		[0]=(kernelCall)module_init,
+		[1]=(kernelCall)module_exit,
 	};
-	kassert(index>=KERNEL_CALL_SELF_DEFINED+LEN_ARRAY(callList));
-	kassert(callList[index]);
+	KASSERT(index>=KERNEL_CALL_SELF_DEFINED+LEN_ARRAY(callList));
+	KASSERT(callList[index]);
 	TEMPLATE_CALL_DISTRIBUTE(callList);
 }

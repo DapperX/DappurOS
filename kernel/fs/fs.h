@@ -1,5 +1,5 @@
-#ifndef _{%moduleName_upperCase%}_H
-#define _{%moduleName_upperCase%}_H
+#ifndef _FS_H
+#define _FS_H
 
 #include "base.h"
 #include "kernel.h"
@@ -12,7 +12,7 @@ static int_var module_exit();
 */
 int_var module_kernelCall(u32 index,...);
 
-u32 module_kernelCall_index=MODULE_TYPE_{%moduleName_upperCase%};
+u32 module_kernelCall_index=MODULE_TYPE_FS;
 kernelCall module_kernelCall_entry=module_kernelCall;
 
-#endif //_{%moduleName_upperCase%}_H
+#endif //_FS_H
