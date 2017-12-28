@@ -1,8 +1,8 @@
+-include $(DIR_MAIN)/tool/template/compile_with_dependence.makefile
+
 CC := gcc
-SRC = $(wildcard *.c) $(wildcard *.asm)
-OBJ = $(patsubst %,%.o,$(basename $(SRC)))
 DIR_INCLUDE = $(DIR_MAIN)/include $(DIR_MAIN)/fs/ext2
-CFLAG += -Werror $(DIR_INCLUDE:%=-I%)
+CFLAG += -Werror
 
 
 .PHONY : build run clean
@@ -12,16 +12,8 @@ run : build
 
 build : testExt2.test
 
-%.o : %.c ;$(CC) $< $(CFLAG) -c -o $@
-%.o : %.asm ;$(ASM) $< $(ASMFLAG) -o $@
-
-%.d : %.c
-	@$(CC) $< $(CFLAG) -MM > $@
-
-sinclude $(SRC:.c=.d)
-
 testExt2.test : $(OBJ)
 	$(CC) $^ $(LDFLAG) -o $@
 
 clean :
-	-rm -f *.d *.o *.a
+	-rm -f *.d *.o *.a testExt2.test

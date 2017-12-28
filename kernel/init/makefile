@@ -1,10 +1,13 @@
-OBJ = header.o init_reg.o init_mem.o
+include $(DIR_MAIN)/tool/template/compile_with_dependence.makefile
+
 ASMFLAG += $(DIR_INCLUDE:%=-i%/)
-CFLAG += -nostdinc $(DIR_INCLUDE:%=-I%)
+CFLAG += -nostdinc
 DEPEND += $(PATH_LIB)
+LDFLAG += -s
+
+.PHONY : all
+
+all : $(DIR_BIN)/init
 
 $(DIR_BIN)/init : $(DEPEND) $(OBJ) linker.ld
-	$(LD) $^ $(LDFLAG) -s -Tlinker.ld -o $@
-
-%.o : %.c ;$(CC) $< $(CFLAG) -c -o $@
-%.o : %.asm ;$(ASM) $< $(ASMFLAG) -o $@
+	$(LD) $^ $(LDFLAG) -Tlinker.ld -o $@

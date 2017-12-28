@@ -26,7 +26,7 @@ build : $(BIN_EXT) $(MOD)
 $(BIN_EXT) $(MOD) test : lib
 
 $(BIN_EXT) $(MOD) test lib :
-	$(MAKE) -C $@
+	$(MAKE) all -C $@
 
 copy : $(patsubst %,$(DIR_IMG)/%,$(BIN_EXT) $(MOD:%=%.mod))
 

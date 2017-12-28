@@ -1,15 +1,13 @@
-OBJ = control.o
+include $(DIR_MAIN)/tool/template/compile_with_dependence.makefile
+
 ASMFLAG += $(DIR_INCLUDE:%=-i%/)
-CFLAG += $(DIR_INCLUDE:%=-I%)
+CFLAG += -nostdinc
 DEPEND += $(PATH_LIB)
+LDFLAG += -r -s
+
+.PHONY : all
+
+all : $(DIR_BIN)/control.mod
 
 $(DIR_BIN)/control.mod : $(DEPEND) $(OBJ) linker.ld
-	$(LD) $^ $(LDFLAG) -r -s -Tlinker.ld -o $@
-
-%.o : %.c ;$(CC) $< $(CFLAG) -c -o $@
-%.o : %.asm ;$(ASM) $< $(ASMFLAG) -o $@
-
-%.d : %.c
-	@$(CC) $< $(CFLAG) -MM > $@
-
-sinclude $(SRC:.c=.d)
+	$(LD) $^ $(LDFLAG) -Tlinker.ld -o $@

@@ -1,20 +1,10 @@
+include $(DIR_MAIN)/tool/template/compile_with_dependence.makefile
+
 CC := gcc
-SRC = $(wildcard *.c) $(wildcard *.asm)
-OBJ = $(patsubst %,%.o,$(basename $(SRC)))
-CFLAG += $(DIR_INCLUDE:%=-I%)
 
+.PHONY : all clean
 
-.PHONY : build clean
-
-build : libDPOS_main.a
-
-%.o : %.c ;$(CC) $< $(CFLAG) -c -o $@
-%.o : %.asm ;$(ASM) $< $(ASMFLAG) -o $@
-
-%.d : %.c
-	$(CC) $< $(DIR_INCLUDE:%=-I%) -MM > $@
-
-sinclude $(SRC:.c=.d)
+all : libDPOS_main.a
 
 libDPOS_main.a : $(OBJ)
 	$(AR) rcs $@ $^

@@ -1,6 +1,6 @@
 TESTMOD = $(patsubst ./%,%,$(shell find . -mindepth 1 -maxdepth 1 -type d))
 
-.PHONY : viewList
+.PHONY : all
 
-viewList:
-	rtn=`./list.sh $(TESTMOD)`;if [ -d "$$rtn" ]; then $(MAKE) -C $$rtn; fi
+all:
+	rtn=`./list.sh $(TESTMOD)`;if [ -d "$$rtn" ]; then $(MAKE) run -C $$rtn; fi

@@ -1,15 +1,13 @@
-OBJ = mm.o
+include $(DIR_MAIN)/tool/template/compile_with_dependence.makefile
+
 ASMFLAG += $(DIR_INCLUDE:%=-i%/)
-CFLAG += -nostdinc $(DIR_INCLUDE:%=-I%)
+CFLAG += -nostdinc
 DEPEND += $(PATH_LIB)
+LDFLAG += -r -s
+
+.PHONY : all
+
+all : $(DIR_BIN)/mm.mod
 
 $(DIR_BIN)/mm.mod : $(DEPEND) $(OBJ) linker.ld
-	$(LD) $^ $(LDFLAG) -r -s -Tlinker.ld -o $@
-
-%.o : %.c ;$(CC) $< $(CFLAG) -c -o $@
-%.o : %.asm ;$(ASM) $< $(ASMFLAG) -o $@
-
-%.d : %.c
-	@$(CC) $< $(CFLAG) -MM > $@
-
-sinclude $(SRC:.c=.d)
+	$(LD) $^ $(LDFLAG) -Tlinker.ld -o $@
