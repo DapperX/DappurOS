@@ -10,6 +10,8 @@
 // `a` must be an array (CANNOT be a pointer)
 #define LEN_ARRAY(a) (sizeof(a)/sizeof(*(a)))
 
+#define DISABLE(x) (void)(x);
+
 typedef char bool;
 typedef unsigned char byte;
 // typedef unsigned short int ushort;

@@ -5,6 +5,19 @@
 #include "elf.h"
 #include "algorithm.h"
 #include "string.h"
+#include "debug.h"
+
+u32 *const pageDirectory=(u32*)(OFFSET_LOW_MEMORY+ADDR_PAGE_DIRECTORY);
+u32 *const pageTable_kernel=(u32*)(OFFSET_LOW_MEMORY+ADDR_PAGE_DIRECTORY+4*1024);
+u32 *const pageTable_temp=(u32*)PAGE_TABLE_TEMP;
+// reversePageTable[i]: high 30 bits show the virtual page address(4bit align) used by i-th physical page
+// low 2 bits show the attribute of this page
+u32 len_reversePageTable=0;
+u32 **const reversePageTable=(u32**)(OFFSET_LOW_MEMORY+ADDR_REVERSE_PAGE_TABLE);
+
+kernelCall *const kernelCallTable=(kernelCall*)(OFFSET_LOW_MEMORY+ADDR_KERNEL_CALL_TABLE);
+
+u32 ACPI_addr=0,ACPI_len=0;
 
 #define ADDR_MBI 0x100000
 #define ADDR_ELF 0x101000
@@ -107,6 +120,8 @@ void elf_init_LMA(byte *const buffer)
 	u32 base[CNT_TYPE];
 
 	Elf32_Ehdr *header=(Elf32_Ehdr*)buffer;
+	kprintf("e_shentsize: %d\n",header->e_shentsize);
+	kprintf("e_shnum: %d\n",header->e_shnum);
 	Elf32_Shdr *section=(Elf32_Shdr*)&buffer[header->e_shoff];
 	for(u32 i=0;i<header->e_shnum;++i)
 	{
@@ -135,9 +150,6 @@ void elf_init_LMA(byte *const buffer)
 void elf_relocate(byte *const buffer)
 {
 	Elf32_Ehdr *header=(Elf32_Ehdr*)buffer;
-	kprintf("e_shentsize: %d\n",header->e_shentsize);
-	kprintf("e_shnum: %d\n",header->e_shnum);
-
 	Elf32_Shdr *section=(Elf32_Shdr*)&buffer[header->e_shoff];
 	char *shstrtab=(char*)&buffer[section[header->e_shstrndx].sh_offset];
 
@@ -145,21 +157,29 @@ void elf_relocate(byte *const buffer)
 	for(u32 i=0;i<header->e_shnum;++i)
 	{
 		if(section[i].sh_type!=SHT_REL) continue;
-		kprintf("#%s symtab:%d dist:%d\n",&shstrtab[section[i].sh_name],section[i].sh_link,section[i].sh_info);
 
 		u32 cnt_reltab=section[i].sh_size/section[i].sh_entsize;
 		Elf32_Rel *reltab=(Elf32_Rel*)&buffer[section[i].sh_offset];
-		Elf32_Sym *symtab=(Elf32_Sym*)&buffer[section[section[i].sh_link].sh_offset];
-		char *strtab=(char*)&buffer[section[section[section[i].sh_link].sh_link].sh_offset];
-		byte *section_dist=(byte*)&buffer[section[section[i].sh_info].sh_offset];
-		byte *addr_section_dist=(byte*)section[section[i].sh_info].sh_addr;
+		Elf32_Word id_symtab=section[i].sh_link;
+		Elf32_Word dist=section[i].sh_info;
+		kprintf("#%s symtab:%d dist:%d\n",&shstrtab[section[i].sh_name],id_symtab,dist);
+
+		Elf32_Sym *symtab=(Elf32_Sym*)&buffer[section[id_symtab].sh_offset];
+		char *strtab=(char*)&buffer[section[section[id_symtab].sh_link].sh_offset];
+		byte *section_dist=(byte*)&buffer[section[dist].sh_offset];
+		byte *addr_section_dist=(byte*)section[dist].sh_addr;
 
 		for(u32 j=0;j<cnt_reltab;++j)
 		{
 			Elf32_Addr offset=reltab[j].r_offset;
 			Elf32_Sym *symbol=&symtab[reltab[j].r_info>>8];
 
-			kprintf("@symtab[%d]: %s\n",reltab[j].r_info>>8,&strtab[symbol->st_name]);
+			kprintf("@symtab[%d]: ",reltab[j].r_info>>8);
+			if((symbol->st_info&0xf)==STT_SECTION)
+				kputs(&shstrtab[section[symbol->st_shndx].sh_name]);
+			else
+				kputs(&strtab[symbol->st_name]);
+			kprintf("offset: %x\n",offset);
 
 			byte *addr_section_sym=NULL;
 			switch(symbol->st_shndx)
@@ -167,13 +187,14 @@ void elf_relocate(byte *const buffer)
 				case SHN_ABS:
 				case SHN_COMMON:
 				case SHN_UNDEF:
+					DEBUG_BREAKPOINT; // ignore these pseudo sections, for now
 					break;
 				default:
 					addr_section_sym=(byte*)section[symbol->st_shndx].sh_addr;
 			}
 			if(!addr_section_sym)
 			{
-				kputs("unsupported symbol section");
+				kprintf("unsupported symbol section %d\n",symbol->st_shndx);
 				continue;
 			}
 
@@ -233,9 +254,15 @@ void set_kernelCall(byte *const buffer)
 }
 
 
+static inline bool cmp_module_start(void *x,void *y)
+{
+	//return cmp_default_pointer(x,y);
+	return ((struct multiboot_tag_module*)x)->mod_start<((struct multiboot_tag_module*)y)->mod_start;
+}
+
 void load_module()
 {
-	ksort(module,module+CNT_MODULE,sizeof(*module),cmp_default_pointer);
+	ksort(module,module+CNT_MODULE,sizeof(*module),cmp_module_start);
 	byte *addr_elf=(byte*)ADDR_ELF;
 	for(u32 i=0;i<cnt_module;++i)
 	{
@@ -278,6 +305,7 @@ void init_pageTable_temp()
 	}
 }
 
+
 void init_pageTable_kernel()
 {
 	// i is the high 20bit of kernel address space
@@ -298,6 +326,7 @@ handle_tag_t handle_tag[7]={
 	[6]=(handle_tag_t)handle_tag_mmap,
 };
 
+
 static inline void enable_page()
 {
 	__asm__ __volatile__(
@@ -311,8 +340,11 @@ static inline void enable_page()
 	);
 }
 
+
 void debug_output()
 {
+	DEBUG_BREAKPOINT;
+	kcls();
 	kputs("##pageDirectory");
 	for(u32 i=0;i<32;++i)
 	{
@@ -331,7 +363,9 @@ void debug_output()
 		kprintf("%x ",pageTable_temp[i]);
 		if(!(~i&3)) kputchar('\n');
 	}
+	DEBUG_BREAKPOINT;
 }
+
 
 void init_memory_(u32 magic,u32 mbi)
 {
@@ -363,8 +397,7 @@ void init_memory_(u32 magic,u32 mbi)
 	init_pageTable_kernel();
 
 	enable_page();
-	//__asm__ __volatile__("hlt");
-	kernelCallTable[0](0); // let's get kernel started
+	kernelCallTable[MODULE_TYPE_CONTROL](KERNEL_CALL_INIT); // let's get kernel started
 }
 
 

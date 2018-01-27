@@ -5,3 +5,4 @@ ata0-master: type=disk, path=disk.img, mode=flat, cylinders=8, heads=16, spt=63
 boot: disk
 mouse: enabled=0
 #keyboard: enabled=1, map=$BXSHARE/keymaps/x11-pc-us.map
+magic_break: enabled=1

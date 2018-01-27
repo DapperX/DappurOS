@@ -3,7 +3,7 @@ include $(DIR_MAIN)/tool/template/compile_with_dependence.makefile
 ASMFLAG += $(DIR_INCLUDE:%=-i%/)
 CFLAG += -nostdinc
 DEPEND += $(PATH_LIB)
-LDFLAG += -r -s
+LDFLAG += -r
 
 .PHONY : all
 

@@ -20,7 +20,7 @@ u32 module_kernelCall_index=MODULE_TYPE_CONTROL;
 kernelCall module_kernelCall_entry=module_kernelCall;
 
 // exclude `control` module itself
-u32 module_preload[]={1,2,3};
-char *module_need_load[]={};
+u32 module_preload[]={MODULE_TYPE_MM,MODULE_TYPE_FS};
+char *module_need_load[]={"fs.mod"};
 
 #endif //_CONTROL_H

@@ -12,6 +12,9 @@
 
 static void kassert_(char* msg,int number,...)
 {
+	DISABLE(msg);
+	DISABLE(number);
+
 	asm volatile("cli\t\n");
 	asm volatile("hlt\t\n");
 }

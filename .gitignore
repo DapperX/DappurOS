@@ -45,3 +45,6 @@ trashbin
 # Backup files
 *.bak
 *~
+
+# List files
+*.list

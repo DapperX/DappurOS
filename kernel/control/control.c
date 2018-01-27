@@ -1,20 +1,26 @@
 #include "control.h"
+#include "print.h"
 #include "assert.h"
+#include "debug.h"
 
 kernelCall *const kernelCallTable=(kernelCall*)(ADDR_KERNEL_CALL_TABLE+OFFSET_HIGH_MEMORY);
 
 int_var load_module(char *moduleName)
 {
+	DISABLE(moduleName);
 	return 0;
 }
 
 int_var unload_module(u32 moduleId)
 {
+	DISABLE(moduleId);
 	return 0;
 }
 
 int_var module_init()
 {
+	kputs("[Control] Initializing...");
+	DEBUG_BREAKPOINT;
 	for(u32 i=0;i<LEN_ARRAY(module_preload);++i)
 	{
 		KASSERT(kernelCallTable[i]);
@@ -40,9 +46,9 @@ int_var module_kernelCall(u32 index,...)
 		[8]=(kernelCall)load_module,
 		[9]=(kernelCall)unload_module
 	};
-	KASSERT(index>=KERNEL_CALL_SELF_DEFINED+LEN_ARRAY(callList));
+	kcls();
+	kprintf("[Control] index: %d\n",index);
+	KASSERT(index<KERNEL_CALL_SELF_DEFINED+LEN_ARRAY(callList));
 	KASSERT(callList[index]);
 	TEMPLATE_CALL_DISTRIBUTE(callList);
-
-	return 0;
 }

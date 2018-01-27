@@ -52,7 +52,7 @@ typedef struct{
 	asm volatile( \
 		"shll	$2, %%edx\n\t" \
 		"addl	%%edx, %%eax\n\t" \
-		"jmp	*%%eax" \
+		"jmp	(%%eax)" \
 	: \
 	: \
 		"a"(callList) \

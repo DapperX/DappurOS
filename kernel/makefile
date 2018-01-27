@@ -2,16 +2,21 @@ export ASM = nasm
 export LD = ld
 export CC = gcc
 export ASMFLAG = -f elf
-export LDFLAG = $(DIR_LIB:%=-L%) $(LIB:%=-l%)
+export LDFLAG = -static
 export CFLAG = -Wall -Wextra -Wconversion -fno-builtin -fno-stack-protector -fno-asynchronous-unwind-tables
 
 export DIR_MAIN = $(shell pwd)
 export DIR_BIN = $(DIR_MAIN)/bin
 export DIR_LIB = $(DIR_MAIN)/lib
-export DIR_INCLUDE = $(DIR_MAIN)/include $(DIR_MAIN)/lib/include
+export DIR_INCLUDE = $(DIR_MAIN)/include $(DIR_LIB)/include
 export DIR_IMG = /mnt
 export LIB = DPOS_main
 export PATH_LIB = $(patsubst %,$(DIR_LIB)/%,$(LIB:%=lib%.a))
+
+ifeq ($(MODE),nodebug)
+	CFLAG += -DNDEBUG
+endif
+
 
 BIN_EXT = init
 MOD_EXCLUDE = $(BIN_EXT) bin include lib tool test

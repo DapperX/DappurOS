@@ -5,15 +5,15 @@ DIR_INCLUDE = $(DIR_MAIN)/include $(DIR_MAIN)/fs/ext2
 CFLAG += -Werror
 
 
-.PHONY : build run clean
+.PHONY : build all clean
 
-run : build
+all : build
 	./testExt2.test
 
 build : testExt2.test
 
 testExt2.test : $(OBJ)
-	$(CC) $^ $(LDFLAG) -o $@
+	$(CC) $^ -o $@
 
 clean :
 	-rm -f *.d *.o *.a testExt2.test

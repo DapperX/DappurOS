@@ -1,6 +1,8 @@
 SRC_C = $(wildcard *.c)
 SRC_ASM = $(wildcard *.asm)
 OBJ = $(SRC_C:%.c=%.o) $(SRC_ASM:%.asm=%.o)
+
+LDFLAG += $(DIR_LIB:%=-L%) $(LIB:%=-l%)
 CFLAG += $(DIR_INCLUDE:%=-I%)
 
 %.o : %.c ;$(CC) $< $(CFLAG) -c -o $@

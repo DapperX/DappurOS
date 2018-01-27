@@ -4,9 +4,9 @@ CC = gcc
 
 .PHONY : all clean
 
-all : libDPOS_main.a
+all : libDPOS_fake.a
 
-libDPOS_main.a : $(OBJ)
+libDPOS_fake.a : $(OBJ)
 	$(AR) rcs $@ $^
 
 clean :
