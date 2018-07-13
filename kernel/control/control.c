@@ -3,7 +3,8 @@
 #include "assert.h"
 #include "debug.h"
 
-kernelCall *const kernelCallTable=(kernelCall*)(ADDR_KERNEL_CALL_TABLE+OFFSET_HIGH_MEMORY);
+kernelCall *const kernelCallTable=(kernelCall*)(OFFSET_KERNEL_CALL_TABLE+ADDR_HIGH_MEMORY);
+extern byte *const bootInfo;
 
 int_var load_module(char *moduleName)
 {
@@ -21,6 +22,13 @@ int_var module_init()
 {
 	kputs("[Control] Initializing...");
 	DEBUG_BREAKPOINT;
+	
+	// Initialize kernel stack
+	//uint_var reg_sp;
+	//asm volatile();
+	//kmemcpy();
+
+	// Initialize loaded modules
 	for(u32 i=0;i<LEN_ARRAY(module_preload);++i)
 	{
 		KASSERT(kernelCallTable[i]);
@@ -30,6 +38,9 @@ int_var module_init()
 	{
 		load_module(module_need_load[i]);
 	}
+
+	//fix_pageTable();
+
 	return 0;
 }
 

@@ -1,10 +1,17 @@
 #include "mm.h"
 #include "assert.h"
 
-kernelCall *const kernelCallTable=(kernelCall*)(ADDR_KERNEL_CALL_TABLE+OFFSET_HIGH_MEMORY);
+kernelCall *const kernelCallTable=(kernelCall*)(OFFSET_KERNEL_CALL_TABLE+ADDR_HIGH_MEMORY);
 
 int_var module_init()
 {
+	/*
+		TODO:
+			remove temporary page table
+			get memory information
+			set interrupt entry
+			
+	*/
 }
 
 int_var module_exit()

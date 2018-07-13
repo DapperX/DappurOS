@@ -5,40 +5,29 @@
 #include "elf.h"
 #include "algorithm.h"
 #include "string.h"
+#include "assert.h"
 #include "debug.h"
 
-u32 *const pageDirectory=(u32*)(OFFSET_LOW_MEMORY+ADDR_PAGE_DIRECTORY);
-u32 *const pageTable_kernel=(u32*)(OFFSET_LOW_MEMORY+ADDR_PAGE_DIRECTORY+4*1024);
-u32 *const pageTable_temp=(u32*)PAGE_TABLE_TEMP;
-// reversePageTable[i]: high 30 bits show the virtual page address(4bit align) used by i-th physical page
-// low 2 bits show the attribute of this page
-u32 len_reversePageTable=0;
-u32 **const reversePageTable=(u32**)(OFFSET_LOW_MEMORY+ADDR_REVERSE_PAGE_TABLE);
+#define ADDR_MBI (ADDR_LOW_MEMORY + OFFSET_IDT)
+#define ADDR_SEGMENT (ADDR_LOW_MEMORY + 12*1024)
 
-kernelCall *const kernelCallTable=(kernelCall*)(OFFSET_LOW_MEMORY+ADDR_KERNEL_CALL_TABLE);
+u32 *const pageDirectory=(u32*)(ADDR_LOW_MEMORY + OFFSET_PAGE_DIRECTORY);
+u32 *const pageTable=(u32*)(ADDR_LOW_MEMORY + OFFSET_PAGE_DIRECTORY + 4096);
+kernelCall *const kernelCallTable=(kernelCall*)(ADDR_LOW_MEMORY + OFFSET_KERNEL_CALL_TABLE);
+
+#define CNT_MODULE 10
+u32 cnt_module = 0;
+struct multiboot_tag_module *module[CNT_MODULE];
 
 u32 ACPI_addr=0,ACPI_len=0;
-
-#define ADDR_MBI 0x100000
-#define ADDR_ELF 0x101000
-
-#define CNT_MODULE 5
-u32 cnt_module=0;
-struct multiboot_tag_module module[CNT_MODULE];
-
-u32 size_reserveMemory;
-
-static inline u32 align8(register u32 p)
-{
-	return (p+7u)&(~7u);
-}
+u32 size_reserveMemory = 12*1024;
 
 static inline u32 align12(register u32 p)
 {
 	return (p+4095u)&(~4095u);
 }
 
-// upper align `val` to multiply of 2**`bit`
+// upper align `val` to multiple of 2**`bit`
 static inline u32 align(u32 val,u32 bit)
 {
 	register u32 mask=(1u<<bit)-1;
@@ -52,12 +41,14 @@ void handle_tag_module(struct multiboot_tag_module *tag)
 	kprintf("Modules: %s\n",tag->cmdline);
 	kprintf("%d %d\n",tag->mod_start,tag->mod_end);
 	if(cnt_module<CNT_MODULE)
-		module[cnt_module++]=*tag;
+		module[cnt_module++] = tag;
 }
 
 // initialize the reversePageTable according to the mmap
+// this part will soon be transfered to `mm` module
 void handle_tag_mmap(struct multiboot_tag_mmap *tag)
 {
+	/*
 	if(tag->entry_version!=0) kputs("Warning: mmap version is incompatible");
 
 	byte *end=(byte*)tag+tag->size;
@@ -84,6 +75,7 @@ void handle_tag_mmap(struct multiboot_tag_mmap *tag)
 		if(end>len_reversePageTable) len_reversePageTable=end;
 	}
 	kprintf("len_reversePageTable:%d\n",len_reversePageTable);
+	*/
 }
 
 
@@ -95,16 +87,19 @@ inline u32* get_addr_PDE(register void *addr_physical)
 void* get_page_free(const u32 cnt,const u32 is_writable)
 {
 	kprintf("get_page: %p %d\n",size_reserveMemory,cnt);
-	const u32 base=size_reserveMemory;
+	const u32 base = size_reserveMemory;
+	if(size_reserveMemory>1048576*2)
+	{
+		kputs("Error: Init memory size is greater than 2MB");
+		HALT;
+	}
+	u32 mask_writable = (!!is_writable)<<1;
 	for(u32 i=0;i<cnt;++i)
 	{
-		u32 *addr_PDE=&pageTable_temp[size_reserveMemory>>12];
-		pageDirectory[size_reserveMemory>>22]=(u32)&pageTable_temp[(size_reserveMemory>>22)*1024]|PDE_P|PDE_R;
-		(*addr_PDE)=size_reserveMemory|PDE_P|is_writable;
-		reversePageTable[size_reserveMemory>>12]=(u32*)(((u32)addr_PDE-OFFSET_LOW_MEMORY+OFFSET_HIGH_MEMORY)|RPE_U);
-		size_reserveMemory+=(1<<12);
+		pageTable[size_reserveMemory>>12] = (ADDR_LOW_MEMORY+size_reserveMemory)|PTE_P|mask_writable;
+		size_reserveMemory += (1<<12);
 	}
-	return (void*)base;
+	return (void*)(ADDR_LOW_MEMORY + base);
 }
 
 void elf_init_LMA(byte *const buffer)
@@ -162,25 +157,25 @@ void elf_relocate(byte *const buffer)
 		Elf32_Rel *reltab=(Elf32_Rel*)&buffer[section[i].sh_offset];
 		Elf32_Word id_symtab=section[i].sh_link;
 		Elf32_Word dist=section[i].sh_info;
-		kprintf("#%s symtab:%d dist:%d\n",&shstrtab[section[i].sh_name],id_symtab,dist);
+	//	kprintf("#%s symtab:%d dist:%d\n",&shstrtab[section[i].sh_name],id_symtab,dist);
 
 		Elf32_Sym *symtab=(Elf32_Sym*)&buffer[section[id_symtab].sh_offset];
 		char *strtab=(char*)&buffer[section[section[id_symtab].sh_link].sh_offset];
 		byte *section_dist=(byte*)&buffer[section[dist].sh_offset];
-		byte *addr_section_dist=(byte*)section[dist].sh_addr;
+		byte *addr_section_dest=(byte*)section[dist].sh_addr;
 
 		for(u32 j=0;j<cnt_reltab;++j)
 		{
 			Elf32_Addr offset=reltab[j].r_offset;
 			Elf32_Sym *symbol=&symtab[reltab[j].r_info>>8];
-
+		/*
 			kprintf("@symtab[%d]: ",reltab[j].r_info>>8);
 			if((symbol->st_info&0xf)==STT_SECTION)
 				kputs(&shstrtab[section[symbol->st_shndx].sh_name]);
 			else
 				kputs(&strtab[symbol->st_name]);
 			kprintf("offset: %x\n",offset);
-
+		*/
 			byte *addr_section_sym=NULL;
 			switch(symbol->st_shndx)
 			{
@@ -199,24 +194,12 @@ void elf_relocate(byte *const buffer)
 			}
 
 			if((reltab[j].r_info&0xff)==R_386_32) // absolute location
-				*(int*)(section_dist+offset)+=(int)((u32)(addr_section_sym+symbol->st_value)-OFFSET_LOW_MEMORY+OFFSET_HIGH_MEMORY);
+				*(int*)(section_dist+offset)+=(int)((u32)(addr_section_sym+symbol->st_value)-ADDR_LOW_MEMORY+ADDR_HIGH_MEMORY);
 			else // relative location(R_386_PC32)
-				*(int*)(section_dist+offset)+=(int)((u32)(addr_section_sym+symbol->st_value)-(u32)(addr_section_dist+offset));
+				*(int*)(section_dist+offset)+=(int)((u32)(addr_section_sym+symbol->st_value)-(u32)(addr_section_dest+offset));
 		}
 	}
 	kprintf("buffer: %p\n",buffer);
-}
-
-
-void load_elf(byte *const buffer)
-{
-	Elf32_Ehdr *header=(Elf32_Ehdr*)buffer;
-	Elf32_Shdr *section=(Elf32_Shdr*)&buffer[header->e_shoff];
-	for(u32 i=0;i<header->e_shnum;++i)
-	{
-		if(!section[i].sh_addr) continue;
-		kmemcpy((byte*)section[i].sh_addr,&buffer[section[i].sh_offset],section[i].sh_size);
-	}
 }
 
 
@@ -232,21 +215,23 @@ void set_kernelCall(byte *const buffer)
 		char *strtab=(char*)&buffer[section[section[i].sh_link].sh_offset];
 
 		u32 kernelCall_index=0;
-		kernelCall kernelCall_entry=NULL;		
+		kernelCall kernelCall_entry = NULL;		
 		for(u32 j=0;j<cnt_symtab;++j)
 		{
-			u32 symVal=*(u32*)(section[symtab[j].st_shndx].sh_addr+symtab[j].st_value);
+			u32 symVal=*(u32*)&buffer[section[symtab[j].st_shndx].sh_offset+symtab[j].st_value];
 			if(!kstrcmp(&strtab[symtab[j].st_name],"module_kernelCall_index"))
 			{
-				kernelCall_index=symVal;
+				kernelCall_index = symVal;
 				kprintf("kernelCall_index: %u\n",kernelCall_index);
 			}
 			if(!kstrcmp(&strtab[symtab[j].st_name],"module_kernelCall_entry"))
 			{
-				kernelCall_entry=(kernelCall)symVal;
+				kernelCall_entry = (kernelCall)symVal;
 				kprintf("kernelCall_entry: %p\n",kernelCall_entry);
 			}
 		}
+		kprintf("KCL idx: %d\n", kernelCall_index);
+		kprintf("KCL entry: %p\n", kernelCall_entry);
 		if(kernelCall_entry)
 			kernelCallTable[kernelCall_index]=kernelCall_entry;
 	}
@@ -254,82 +239,142 @@ void set_kernelCall(byte *const buffer)
 }
 
 
+static inline bool cmp_section_LMA(void *x,void *y)
+{
+	return (*(Elf32_Shdr **)x)->sh_addr < (*(Elf32_Shdr **)y)->sh_addr;
+}
+
+byte* collect_section(byte *buffer, byte *addr_segment, u32 *const info_copy)
+{
+	KASSERT(addr_segment<buffer);
+
+	#define CNT_SECTION_COLLECT 8
+	Elf32_Shdr *section_collect[CNT_SECTION_COLLECT];
+	u32 cnt_section_collect = 0;
+
+	Elf32_Ehdr *header=(Elf32_Ehdr*)buffer;
+	Elf32_Shdr *section=(Elf32_Shdr*)&buffer[header->e_shoff];
+	for(u32 i=0;i<header->e_shnum;++i)
+	{
+		if(!section[i].sh_addr) continue;
+		if(cnt_section_collect>=CNT_SECTION_COLLECT)
+		{
+			kputs("Error: too many sections to load");
+			HALT;
+		}
+		section_collect[cnt_section_collect++] = &section[i];
+	}
+
+	ksort(section_collect,section_collect+cnt_section_collect,sizeof(*section_collect),cmp_section_LMA);
+
+	// safe copy sections to `addr_segment`
+	for(u32 i=0;i<cnt_section_collect;++i)
+	{
+		#define SIZE_EXCHANGE 32
+		byte exchange[SIZE_EXCHANGE];
+
+		u32 offset = section_collect[i]->sh_offset;
+		u32 size_section = section_collect[i]->sh_size;
+		KASSERT((i32)offset>0);
+
+		u32 cnt_info_copy = info_copy[0]++;
+		info_copy[cnt_info_copy*3+1] = section_collect[i]->sh_addr;
+		info_copy[cnt_info_copy*3+2] = (u32)addr_segment;
+		info_copy[cnt_info_copy*3+3] = size_section;
+
+		for(u32 i=0;i<size_section/SIZE_EXCHANGE;++i)
+		{
+			kmemcpy(exchange,buffer+offset,SIZE_EXCHANGE);
+			kmemmove(buffer+SIZE_EXCHANGE,buffer,offset);
+			kmemcpy(addr_segment,exchange,SIZE_EXCHANGE);
+			buffer+=SIZE_EXCHANGE, addr_segment+=SIZE_EXCHANGE;
+		}
+		u32 t = size_section%SIZE_EXCHANGE;
+		kmemcpy(exchange,buffer+offset,t);
+		kmemmove(buffer+(t/8*8),buffer,offset); // prevent misalign
+		kmemcpy(addr_segment,exchange,t);
+		buffer+=t/8*8, addr_segment+=t;
+
+		for(u32 j=i+1;j<cnt_section_collect;++j)
+		{
+			if((byte*)section_collect[j]<buffer+offset)
+				section_collect[j] = (Elf32_Shdr*)((byte*)section_collect[j]+size_section/8*8);
+			if(section_collect[j]->sh_offset>offset)
+				section_collect[j]->sh_offset-=size_section/8*8;
+		}
+	}
+	return addr_segment;
+}
+
+void fix_copy_section(u32 *const info_copy)
+{
+	u32 cnt_info_copy = info_copy[0];
+	for(u32 i=cnt_info_copy;i>0;--i)
+		kmemmove((byte*)info_copy[(i-1)*3+1],(byte*)info_copy[(i-1)*3+2],info_copy[(i-1)*3+3]);
+}
+
 static inline bool cmp_module_start(void *x,void *y)
 {
-	//return cmp_default_pointer(x,y);
-	return ((struct multiboot_tag_module*)x)->mod_start<((struct multiboot_tag_module*)y)->mod_start;
+	return (*(struct multiboot_tag_module**)x)->mod_start<(*(struct multiboot_tag_module**)y)->mod_start;
 }
 
 void load_module()
 {
-	ksort(module,module+CNT_MODULE,sizeof(*module),cmp_module_start);
-	byte *addr_elf=(byte*)ADDR_ELF;
+	byte *addr_segment = (byte*)ADDR_SEGMENT;
+	static u32 *const info_copy = (u32*)(ADDR_LOW_MEMORY + 11*1024);
+	info_copy[0] = 0;
+
+	ksort(module,module+cnt_module,sizeof(*module),cmp_module_start);
 	for(u32 i=0;i<cnt_module;++i)
 	{
-		u32 size=module[i].mod_end-module[i].mod_start;
-		kmemcpy(addr_elf,(byte*)module[i].mod_start,size);
-		module[i].mod_start=(u32)addr_elf;
-		addr_elf+=size;
-	}
-	for(u32 i=0;i<cnt_module;++i)
-	{
-		byte *const addr_module=(byte*)module[i].mod_start;
+		byte *const addr_module=(byte*)module[i]->mod_start;
 		elf_init_LMA(addr_module);
 		elf_relocate(addr_module);
-		load_elf(addr_module);
 		set_kernelCall(addr_module);
+		addr_segment = collect_section(addr_module,addr_segment,info_copy);
 	}
+	fix_copy_section(info_copy);
 }
 
 
 void init_pageDirectory()
 {
-	const u32 cnt_pageDirectory=(1<<10);
-	for(register u32 i=0;i<cnt_pageDirectory;++i)
-		pageDirectory[i]=0;
-	// important! it needs to align to 2**22(4MB)
-	for(register u32 i=0;i<align(size_reserveMemory,22)>>22;++i)
-		pageDirectory[i]=(u32)&pageTable_temp[i*1024]|PDE_P|PDE_R;
-	for(register u32 i=(OFFSET_HIGH_MEMORY>>22);i<cnt_pageDirectory;++i)
-		pageDirectory[i]=(u32)&pageTable_kernel[(i-(OFFSET_HIGH_MEMORY>>22))*1024]|PDE_P|PDE_R;
+	kmemset(pageDirectory,0,4096);
+	// Under the limit that init memory size <= 2MB,
+	// Only one page directory needs setting in high memory area
+	pageDirectory[ADDR_HIGH_MEMORY>>22] = (u32)pageTable|PDE_P|PDE_R;
 }
 
-
-void init_pageTable_temp()
+void init_pageTable()
 {
-	// i is the high 20bit of reserve memory
-	for(register u32 i=0;i<(size_reserveMemory>>12);++i)
-	{
-		// 0x0:size_reserveMemory -> 0x0:size_reserveMemory
-		pageTable_temp[i]=(i<<12)|PTE_P|PTE_R;
-	}
+	kmemset(pageTable, 0, 1024);
+	const u32 cnt_PTE = size_reserveMemory>>12;
+	// ADDR_HIGH_MEMORY:ADDR_HIGH_MEMORY+size_reserveMemory -> ADDR_LOW_MEMORY:ADDR_LOW_MEMORY+size_reserveMemory
+	// i is the high 20bit of offset
+	for(register u32 i=0;i<cnt_PTE;++i)
+		pageTable[i] = (ADDR_LOW_MEMORY+(i<<12))|PTE_P|PTE_R;
 }
 
-
-void init_pageTable_kernel()
+void init_page_temp()
 {
-	// i is the high 20bit of kernel address space
-	for(register u32 i=(OFFSET_HIGH_MEMORY>>12);i<(1<<20);++i)
-		pageTable_kernel[i-(OFFSET_HIGH_MEMORY>>12)]=0;
-	// i is the high 20bit of reserve memory
-	for(register u32 i=(OFFSET_LOW_MEMORY>>12);i<(size_reserveMemory>>12);++i)
-	{
-		// OFFSET_HIGH_MEMORY:OFFSET_HIGH_MEMORY+size_reserveMemory-1MB -> 1MB:size_reserveMemory
-		pageTable_kernel[i-(OFFSET_LOW_MEMORY>>12)]=pageTable_temp[i];
-	}
+	// Since this code locates in low memory area,
+	// to keep running after enabling pages,
+	// we need to establish a temporary page mapping
+	// 0:ADDR_LOW_MEMORY+size_reserveMemory -> 0:ADDR_LOW_MEMORY+size_reserveMemory
+	u32 *const pageTable_temp = (u32*)(ADDR_LOW_MEMORY+size_reserveMemory);
+
+	const u32 cnt_PDE = align(ADDR_LOW_MEMORY+size_reserveMemory,22)>>22;
+	for(register u32 i=0;i<cnt_PDE;++i)
+		pageDirectory[i] = (u32)&pageTable_temp[i*1024]|PDE_P|PDE_R;
+
+	const u32 cnt_PTE = (ADDR_LOW_MEMORY+size_reserveMemory)>>12;
+	for(register u32 i=0;i<cnt_PTE;++i)
+		pageTable_temp[i] = (i<<12)|PTE_P|PTE_R;
 }
-
-
-typedef void (*handle_tag_t)(struct multiboot_tag*); 
-handle_tag_t handle_tag[7]={
-	[3]=(handle_tag_t)handle_tag_module,
-	[6]=(handle_tag_t)handle_tag_mmap,
-};
-
 
 static inline void enable_page()
 {
-	__asm__ __volatile__(
+	asm volatile(
 		"movl %0, %%cr3\n\t"
 		"movl %%cr0, %%eax\n\t"
 		"orl $0x80010000, %%eax\n\t"
@@ -351,21 +396,27 @@ void debug_output()
 		kprintf("%x ",pageDirectory[i]);
 		if(!(~i&3)) kputchar('\n');
 	}
-	kputs("##pageTable_kernel");
+	kputs("##pageTable");
 	for(u32 i=0;i<32;++i)
 	{
-		kprintf("%x ",pageTable_kernel[i]);
+		kprintf("%x ",pageTable[i]);
 		if(!(~i&3)) kputchar('\n');
 	}
 	kputs("##pageTable_temp");
 	for(u32 i=0;i<32;++i)
 	{
-		kprintf("%x ",pageTable_temp[i]);
+		kprintf("%x ",pageTable[i+1024]);
 		if(!(~i&3)) kputchar('\n');
 	}
 	DEBUG_BREAKPOINT;
 }
 
+
+typedef void (*handle_tag_t)(struct multiboot_tag*); 
+handle_tag_t handle_tag[7]={
+	[MULTIBOOT_TAG_TYPE_MODULE]=(handle_tag_t)handle_tag_module,
+	[MULTIBOOT_TAG_TYPE_MMAP]=(handle_tag_t)handle_tag_mmap,
+};
 
 void init_memory_(u32 magic,u32 mbi)
 {
@@ -375,27 +426,34 @@ void init_memory_(u32 magic,u32 mbi)
 	kprintf("mbi: %p\n",mbi);
 	if(mbi&7) return;
 
+	// handle multiboot information
 	kmemcpy((byte*)ADDR_MBI,(byte*)mbi,*(u32*)mbi);
-
 	struct multiboot_tag *tag=(struct multiboot_tag*)(ADDR_MBI+8);
 	while(tag->type!=MULTIBOOT_TAG_TYPE_END)
 	{
+		kprintf("tag: %d\n",tag->type);
 		if(tag->type<7 && handle_tag[tag->type])
+		{
+			kputs("handled");
 			handle_tag[tag->type](tag);
-		tag=(struct multiboot_tag*)align8((u32)tag+tag->size);
+		}
+		tag=(struct multiboot_tag*)align((u32)tag+tag->size,__builtin_ctz(MULTIBOOT_INFO_ALIGN));
 	}
 
-	kmemset(kernelCallTable,0,256);
-	size_reserveMemory=align12((u32)&reversePageTable[len_reversePageTable]);
-
+	// initialize all page settings (the allocation will happens later)
 	init_pageDirectory();
-	// since the modules will temporarily occupy the `pageTable_kernel` memory area
-	// while to load modules, it needs to modify `pageTable_temp`
-	// it has to initialize these two pageTables respectively
-	init_pageTable_temp();
-	load_module();
-	init_pageTable_kernel();
+	init_pageTable();
+	kmemset(kernelCallTable,0,256);
 
+	load_module();
+
+	// preparing the information passing to the `control` module
+	kmemset(bootInfo, 0, 1024);
+	// bootInfo[0..3]: size_reserveMemory
+	*(u32*)&bootInfo[0] = size_reserveMemory;
+
+	// enable pages
+	init_page_temp();
 	enable_page();
 	kernelCallTable[MODULE_TYPE_CONTROL](KERNEL_CALL_INIT); // let's get kernel started
 }

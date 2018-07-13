@@ -22,6 +22,6 @@ void kswap(void *x,void *y,u32 size)
 void ksort(void *begin,void *end,u32 size_element,bool (*cmp)(void*,void*))
 {
 	for(byte* i=begin;i<(byte*)end;i+=size_element)
-		for(byte *j=begin+size_element;j<(byte*)end;j+=size_element)
-			if(cmp(i,j)) kswap(i,j,size_element);
+		for(byte *j=i+size_element;j<(byte*)end;j+=size_element)
+			if(cmp(j,i)) kswap(i,j,size_element);
 }

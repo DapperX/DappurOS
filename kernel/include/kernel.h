@@ -5,11 +5,13 @@
 
 // for now only support at most 3.75GB address
 // just be convenient to avoid special memory area such as SLIC
-#define MIN_MEMORY 0xf0000000
-#define OFFSET_HIGH_MEMORY 0xc0000000
-#define ADDR_PAGE_DIRECTORY 0x0
-#define ADDR_REVERSE_PAGE_TABLE 0x101A00
-#define ADDR_KERNEL_CALL_TABLE 0x101900
+#define MAX_MEMORY 0xf0000000
+#define ADDR_HIGH_MEMORY 0xc0000000
+#define OFFSET_PAGE_DIRECTORY 0x0
+#define OFFSET_IDT 0x2000
+#define OFFSET_GDT 0x2800
+#define OFFSET_LDT 0x2880
+#define OFFSET_KERNEL_CALL_TABLE 0x2900
 
 #define INT_LINUX 0x80
 #define INT_DEBUG 0x81

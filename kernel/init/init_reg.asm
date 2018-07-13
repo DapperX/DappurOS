@@ -2,26 +2,11 @@
 %include "macro.inc"
 
 
-[SECTION PDE_kernel]
-%rep 1024
-	dd 0
-%endrep
-
-[SECTION IDT]
-ALIGN	32
-IdtBegin:
-%rep 256
-	GATE_MAKE	0, 0, 0, DA_386IGate
-%endrep
-
-IdtLen		equ	$ - $$
-IdtPtr:		dw	IdtLen - 1
-			dd	IdtBegin
-;end of[SECTION IDT]
-
-
-[SECTION GDT]
-ALIGN 32
+[SECTION .data]
+ALIGN 8
+extern LMA_GDT
+extern LMA_LDT
+; GDT
 GdtBegin:
 GdtNull:		DESCRIPOR_MAKE	0, 0, 0
 GdtKernelCode:	DESCRIPOR_MAKE	0, 0xffffffff, DA_32 | DA_C | DA_DPL_0 | DA_G
@@ -34,10 +19,7 @@ GdtVideo:		DESCRIPOR_MAKE	ADDR_VIDEO, 0x0ffff, DA_16 | DA_DRW | DA_DPL_3
 	DESCRIPOR_MAKE	0, 0, 0
 %endrep
 
-LEN_GDT	equ	$ - $$
-GdtPtr:
-	dw	LEN_GDT - 1
-	dd	GdtBegin
+LEN_GDT	equ	$ - GdtBegin
 
 SEL_GDT_CODE_KERNEL	equ GdtKernelCode - GdtBegin
 SEL_GDT_DATA_KERNEL	equ GdtKernelData - GdtBegin
@@ -45,37 +27,60 @@ SEL_GDT_CODE_USER	equ GdtUserCode - GdtBegin
 SEL_GDT_DATA_USER	equ GdtUserData - GdtBegin
 SEL_GDT_LDT			equ GdtLdt - GdtBegin
 SEL_GDT_VIDEO		equ GdtVideo - GdtBegin
-;end of[SECTION GDT]
 
-
-[SECTION LDT]
-ALIGN 32
+; LDT
 LdtBegin:
 LdtUserCode:	DESCRIPOR_MAKE	0, 0xffffffff, DA_32 | DA_C | DA_DPL_3
 LdtUserData:	DESCRIPOR_MAKE	0, 0xffffffff, DA_32 | DA_DRWA | DA_DPL_3
 
-LEN_LDT	equ	$ - $$
+LEN_LDT	equ	$ - LdtBegin
 
 SEL_LDT_CODE_USER	equ	LdtUserCode - LdtBegin + SA_TIL
 SEL_LDT_DATA_USER	equ	LdtUserData - LdtBegin + SA_TIL
-;end of[SECTION LDT]
 
 
-STACK_TOP_TEMP	equ 0x7c00
-extern init_memory
+GdtPtr:
+	dw	LEN_GDT - 1
+	dd	LMA_GDT
+; end of [SECTION .data]
+
+
+[SECTION reserve nobits write]
+ALIGN 4096
+resb (12*1024)
+; end of [SECTION reserve]
+
+
+STACK_TOP_TEMP	equ 0x102000 ; 1M+8K
+
 
 [SECTION start]
 global module_start
-
 module_start:
+	; save eax
+	mov edx, eax
+	; initialize LDT entry
+	DESCRIPOR_SET_BASE	GdtLdt, LMA_LDT
+	; copy GDT to the target location
+	cld
+	mov edi, LMA_GDT
+	mov esi, GdtBegin
+	mov ecx, LEN_GDT
+	rep movsb
+	; copy LDT to the target location
+	mov edi, LMA_LDT
+	mov esi, LdtBegin
+	mov ecx, LEN_LDT
+	rep movsb
+
 	lgdt [GdtPtr]
 	jmp SEL_GDT_CODE_KERNEL:init_register
-;end of [SECTION start]
+; end of [SECTION start]
+
 
 [SECTION .text]
+extern init_memory
 init_register:
-	mov edx, eax
-
 	;init video
 	mov ax, SEL_GDT_VIDEO
 	mov gs, ax
@@ -89,11 +94,8 @@ init_register:
 	mov esp, STACK_TOP_TEMP
 	mov ebp, esp
 
-	DESCRIPOR_SET_BASE	GdtLdt, LdtBegin
 	mov ax, SEL_GDT_LDT
 	lldt ax
-
-	lidt [IdtPtr]
 
 	push ebx
 	push edx
@@ -101,3 +103,4 @@ init_register:
 	; `init_memory` should never return, or the startup has failed
 	; if so, halt 
 	hlt
+; end of [SECTION .text]

@@ -1,6 +1,6 @@
 #include "memory.h"
 
-void* kmemset(void *dest,byte val,u32 size)
+void* kmemset(void *dest,byte val,uint_var size)
 {
 	register byte *p=(byte*)dest;
 	register byte *end=(byte*)dest+size;
@@ -8,11 +8,45 @@ void* kmemset(void *dest,byte val,u32 size)
 	return dest;
 }
 
-void* kmemcpy(void *dest,const void *src,u32 size)
+void* kmemcpy(void *dest,const void *src,uint_var size)
 {
 	register byte *p=(byte*)dest;
 	register const byte *t=(const byte*)src;
 	byte *end=(byte*)dest+size;
 	while(p<end) *p++=*t++;
 	return dest;
+}
+
+void* kmemmove(void *dest,const void *src,uint_var size)
+{
+	asm volatile(
+		"movw	%%ds, %%ax\n\t"
+		"movw	%%ax, %%es\n\t"
+	:::
+		"ax"
+	);
+	if(dest<src)
+	{
+		asm volatile(
+			"cld\n\t"
+		::
+			"D"(dest),"S"(src),"c"(size)
+		:
+		);
+	}
+	else
+	{
+		asm volatile(
+			"std\n\t"
+		::
+			"D"((char*)dest+size-1),"S"((char*)src+size-1),"c"(size)
+		:
+		);
+	}
+	asm volatile(
+		"rep movsb\n\t"
+		"cld\n\t"
+	:::
+		"memory"
+	);
 }

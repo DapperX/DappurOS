@@ -4,7 +4,8 @@
 
 #include "base.h"
 
-void* kmemset(void *dest,byte val,u32 size);
-void* kmemcpy(void *dest,const void *src,u32 size);
+void* kmemset(void *dest,byte val,uint_var size);
+void* kmemcpy(void *dest,const void *src,uint_var size);
+void* kmemmove(void *dest,const void *src,uint_var size);
 
 #endif //_MEMORY_H

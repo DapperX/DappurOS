@@ -47,4 +47,4 @@ trashbin
 *~
 
 # List files
-*.list
+# *.list

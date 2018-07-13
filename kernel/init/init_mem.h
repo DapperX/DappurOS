@@ -6,8 +6,9 @@
 #include "kernel.h"
 
 // the start of physical address of kernel
-#define OFFSET_LOW_MEMORY 0x100000
-#define PAGE_TABLE_TEMP 0x32000
+#define ADDR_LOW_MEMORY 0x100000
+
+byte *const bootInfo = (byte*)(ADDR_LOW_MEMORY + OFFSET_PAGE_DIRECTORY + 4096 + 2048);
 
 // expose inner functions to test or debug
 #ifndef NDEBUG

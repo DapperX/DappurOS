@@ -23,6 +23,6 @@ DA_386TGate	equ	8fh
 
 DA_G	equ 0x8000
 
-ADDR_VIDEO	equ	0b8000h
+ADDR_VIDEO	equ	0xb8000
 
 SA_TIL	equ	4h

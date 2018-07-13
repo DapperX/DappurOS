@@ -1,0 +1,3 @@
+add more cmd parameters for nasm
+add the support for `.bss` segment for init loading
+fix all makefiles about lib path

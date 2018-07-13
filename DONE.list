@@ -1,0 +1,2 @@
+add `kmemmove`
+fix the type of parameter 'size' in memory.c

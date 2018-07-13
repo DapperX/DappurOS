@@ -1,4 +1,4 @@
-SECTION .multiboot_header
+[SECTION multiboot_header noalloc]
 ALIGN 8
 
 MULTIBOOT_HEADER_MAGIC		equ	0xE85250D6
@@ -15,8 +15,8 @@ header_start:
 	dw 0x1
 	dw 0x0
 	dd 16
-	dd 3
-	dd 6
+	dd 3 ; module
+	dd 6 ; mmap
 
 	;required end tag
 	dw 0	; type
