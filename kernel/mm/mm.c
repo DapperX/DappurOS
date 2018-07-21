@@ -1,7 +1,7 @@
 #include "mm.h"
 #include "assert.h"
 
-kernelCall *const kernelCallTable=(kernelCall*)(OFFSET_KERNEL_CALL_TABLE+ADDR_HIGH_MEMORY);
+kernelCall *const kernelCallTable=(kernelCall*)(OFFSET_KCT+ADDR_HIGH_MEMORY);
 
 int_var module_init()
 {

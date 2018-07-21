@@ -31,7 +31,6 @@ void* kmemmove(void *dest,const void *src,uint_var size)
 			"cld\n\t"
 		::
 			"D"(dest),"S"(src),"c"(size)
-		:
 		);
 	}
 	else
@@ -40,7 +39,6 @@ void* kmemmove(void *dest,const void *src,uint_var size)
 			"std\n\t"
 		::
 			"D"((char*)dest+size-1),"S"((char*)src+size-1),"c"(size)
-		:
 		);
 	}
 	asm volatile(

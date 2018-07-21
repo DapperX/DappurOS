@@ -51,7 +51,7 @@ resb (12*1024)
 ; end of [SECTION reserve]
 
 
-STACK_TOP_TEMP	equ 0x102000 ; 1M+8K
+STACK_TOP_TEMP	equ 0x102800 ; 1M+10K
 
 
 [SECTION start]

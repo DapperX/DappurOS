@@ -8,10 +8,13 @@
 #define MAX_MEMORY 0xf0000000
 #define ADDR_HIGH_MEMORY 0xc0000000
 #define OFFSET_PAGE_DIRECTORY 0x0
+#define OFFSET_PAGE_TABLE_INIT 0x1000
+#define OFFSET_PAGE_TABLE_KERNEL 0x200000
 #define OFFSET_IDT 0x2000
 #define OFFSET_GDT 0x2800
 #define OFFSET_LDT 0x2880
-#define OFFSET_KERNEL_CALL_TABLE 0x2900
+#define OFFSET_KCT 0x2900
+#define ADDR_STACK 0xe0000000
 
 #define INT_LINUX 0x80
 #define INT_DEBUG 0x81
@@ -22,7 +25,19 @@ typedef int_var (*kernelCall)(u32 index, ...);
 typedef struct{
 	u32 funcId;
 	char *name;
-}module_info;
+}info_module;
+typedef struct{
+	u32 type;
+	u32 cnt;
+}info_header;
+typedef struct{
+	u64 start;
+	u64 len;
+}info_memory;
+typedef struct{
+	u64 start;
+	u64 len;
+}info_ACPI;
 /*
 	kernelCall convention
 	0: module_init

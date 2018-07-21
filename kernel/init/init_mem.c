@@ -7,20 +7,27 @@
 #include "string.h"
 #include "assert.h"
 #include "debug.h"
+#include "macro.h"
 
-#define ADDR_MBI (ADDR_LOW_MEMORY + OFFSET_IDT)
-#define ADDR_SEGMENT (ADDR_LOW_MEMORY + 12*1024)
+#define MEMORY_USED_INIT (12*1024)
+#define ADDR_MBI (ADDR_LOW_MEMORY + OFFSET_PAGE_TABLE_INIT + 2048)
+#define ADDR_SEGMENT (ADDR_LOW_MEMORY + MEMORY_USED_INIT)
 
 u32 *const pageDirectory=(u32*)(ADDR_LOW_MEMORY + OFFSET_PAGE_DIRECTORY);
 u32 *const pageTable=(u32*)(ADDR_LOW_MEMORY + OFFSET_PAGE_DIRECTORY + 4096);
-kernelCall *const kernelCallTable=(kernelCall*)(ADDR_LOW_MEMORY + OFFSET_KERNEL_CALL_TABLE);
+kernelCall *const kernelCallTable=(kernelCall*)(ADDR_LOW_MEMORY + OFFSET_KCT);
 
 #define CNT_MODULE 10
 u32 cnt_module = 0;
 struct multiboot_tag_module *module[CNT_MODULE];
 
-u32 ACPI_addr=0,ACPI_len=0;
-u32 size_reserveMemory = 12*1024;
+#define CNT_MEM_TOTAL 4
+u32 cnt_mem_total = 0;
+info_memory mem_total[CNT_MEM_TOTAL];
+
+info_ACPI ACPI = (info_ACPI){0};
+
+u32 size_reserveMemory = MEMORY_USED_INIT;
 
 static inline u32 align12(register u32 p)
 {
@@ -48,7 +55,6 @@ void handle_tag_module(struct multiboot_tag_module *tag)
 // this part will soon be transfered to `mm` module
 void handle_tag_mmap(struct multiboot_tag_mmap *tag)
 {
-	/*
 	if(tag->entry_version!=0) kputs("Warning: mmap version is incompatible");
 
 	byte *end=(byte*)tag+tag->size;
@@ -57,25 +63,16 @@ void handle_tag_mmap(struct multiboot_tag_mmap *tag)
 		entry=(multiboot_memory_map_t*)((byte*)entry+tag->entry_size))
 	{
 		if(entry->type==MULTIBOOT_MEMORY_ACPI_RECLAIMABLE)
-			ACPI_addr=(u32)entry->addr,ACPI_len=(u32)entry->len; // {unsafe}
+			ACPI = (info_ACPI){entry->addr,entry->len};
 
-		if(entry->addr>=MIN_MEMORY) continue;
-
-		u32 begin=(u32)(entry->addr)>>12; // {unsafe}
-		u32 end=(u32)(entry->addr+entry->len)>>12; // {unsafe}
-		u32 attr_used=entry->type==MULTIBOOT_MEMORY_AVAILABLE?0:RPE_U;
-
-		// pad holes between memory blocks
-		for(register u32 i=len_reversePageTable;i<begin;++i)
-			reversePageTable[i]=(u32*)RPE_U;
-
-		for(register u32 i=begin;i<end;++i)
-			reversePageTable[i]=(u32*)((i<<12)|attr_used);
-
-		if(end>len_reversePageTable) len_reversePageTable=end;
+		if(entry->type!=MULTIBOOT_MEMORY_AVAILABLE) continue;
+		if(entry->addr<MAX_MEMORY)
+		{
+			kprintf("Avaliable memory %p:%p\n",(u32)entry->addr,(u32)(entry->addr+entry->len));
+			if(cnt_mem_total<CNT_MEM_TOTAL)
+				mem_total[cnt_mem_total++] = (info_memory){entry->addr,entry->len};
+		}
 	}
-	kprintf("len_reversePageTable:%d\n",len_reversePageTable);
-	*/
 }
 
 
@@ -88,7 +85,7 @@ void* get_page_free(const u32 cnt,const u32 is_writable)
 {
 	kprintf("get_page: %p %d\n",size_reserveMemory,cnt);
 	const u32 base = size_reserveMemory;
-	if(size_reserveMemory>1048576*2)
+	if(size_reserveMemory>1048576*1.75)
 	{
 		kputs("Error: Init memory size is greater than 2MB");
 		HALT;
@@ -137,8 +134,12 @@ void elf_init_LMA(byte *const buffer)
 		if(section[i].sh_flags&SHF_ALLOC)
 		{
 			section[i].sh_addr+=base[TO_TYPE_SEGMENT(section[i].sh_flags)];
-			kprintf("*section[%d].addr:%p\n",i,section[i].sh_addr);
+			kprintf("section[%d].addr:%p\n",i,section[i].sh_addr);
 		}
+	#undef CNT_TYPE
+	#undef TO_TYPE_SEGMENT
+	#undef SEGMENT_RW
+	#undef SEGMENT_RO
 }
 
 
@@ -156,13 +157,13 @@ void elf_relocate(byte *const buffer)
 		u32 cnt_reltab=section[i].sh_size/section[i].sh_entsize;
 		Elf32_Rel *reltab=(Elf32_Rel*)&buffer[section[i].sh_offset];
 		Elf32_Word id_symtab=section[i].sh_link;
-		Elf32_Word dist=section[i].sh_info;
-	//	kprintf("#%s symtab:%d dist:%d\n",&shstrtab[section[i].sh_name],id_symtab,dist);
+		Elf32_Word dest=section[i].sh_info;
+	//	kprintf("#%s symtab:%d dest:%d\n",&shstrtab[section[i].sh_name],id_symtab,dest);
 
 		Elf32_Sym *symtab=(Elf32_Sym*)&buffer[section[id_symtab].sh_offset];
 		char *strtab=(char*)&buffer[section[section[id_symtab].sh_link].sh_offset];
-		byte *section_dist=(byte*)&buffer[section[dist].sh_offset];
-		byte *addr_section_dest=(byte*)section[dist].sh_addr;
+		byte *section_dest=(byte*)&buffer[section[dest].sh_offset];
+		byte *addr_section_dest=(byte*)section[dest].sh_addr;
 
 		for(u32 j=0;j<cnt_reltab;++j)
 		{
@@ -194,9 +195,9 @@ void elf_relocate(byte *const buffer)
 			}
 
 			if((reltab[j].r_info&0xff)==R_386_32) // absolute location
-				*(int*)(section_dist+offset)+=(int)((u32)(addr_section_sym+symbol->st_value)-ADDR_LOW_MEMORY+ADDR_HIGH_MEMORY);
+				*(int*)(section_dest+offset)+=(int)((u32)(addr_section_sym+symbol->st_value)-ADDR_LOW_MEMORY+ADDR_HIGH_MEMORY);
 			else // relative location(R_386_PC32)
-				*(int*)(section_dist+offset)+=(int)((u32)(addr_section_sym+symbol->st_value)-(u32)(addr_section_dest+offset));
+				*(int*)(section_dest+offset)+=(int)((u32)(addr_section_sym+symbol->st_value)-(u32)(addr_section_dest+offset));
 		}
 	}
 	kprintf("buffer: %p\n",buffer);
@@ -282,6 +283,13 @@ byte* collect_section(byte *buffer, byte *addr_segment, u32 *const info_copy)
 		info_copy[cnt_info_copy*3+2] = (u32)addr_segment;
 		info_copy[cnt_info_copy*3+3] = size_section;
 
+		// Handle NOBITS section (like .bss)
+		if(section_collect[i]->sh_type==SHT_NOBITS)
+		{
+			info_copy[cnt_info_copy*3+2] = 0;
+			continue;
+		}
+
 		for(u32 i=0;i<size_section/SIZE_EXCHANGE;++i)
 		{
 			kmemcpy(exchange,buffer+offset,SIZE_EXCHANGE);
@@ -304,13 +312,22 @@ byte* collect_section(byte *buffer, byte *addr_segment, u32 *const info_copy)
 		}
 	}
 	return addr_segment;
+
+	#undef SIZE_EXCHANGE
+	#undef CNT_SECTION_COLLECT
 }
 
 void fix_copy_section(u32 *const info_copy)
 {
 	u32 cnt_info_copy = info_copy[0];
 	for(u32 i=cnt_info_copy;i>0;--i)
-		kmemmove((byte*)info_copy[(i-1)*3+1],(byte*)info_copy[(i-1)*3+2],info_copy[(i-1)*3+3]);
+	{
+		// Handle NOBITS cases
+		if(info_copy[(i-1)*3+2])
+			kmemmove((byte*)info_copy[(i-1)*3+1],(byte*)info_copy[(i-1)*3+2],info_copy[(i-1)*3+3]);
+		else
+			kmemset((byte*)info_copy[(i-1)*3+1],0,info_copy[(i-1)*3+3]);
+	}
 }
 
 static inline bool cmp_module_start(void *x,void *y)
@@ -386,6 +403,28 @@ static inline void enable_page()
 }
 
 
+void init_bootInfo()
+{
+	info_header *bootInfo  = (info_header*)(ADDR_LOW_MEMORY+OFFSET_BOOTINFO);
+	kmemset(bootInfo, 0, 1024);
+	const u32 e = __builtin_ctz(sizeof(info_header));
+
+	*(bootInfo++) = (info_header){BOOTINFO_MEM_TOTAL,cnt_mem_total};
+	kmemcpy(bootInfo,mem_total,sizeof(*mem_total)*cnt_mem_total);
+	bootInfo += align(sizeof(*mem_total)*cnt_mem_total,e)>>e;
+
+	*(bootInfo++) = (info_header){BOOTINFO_MEM_USED,1};
+	*(info_memory*)bootInfo = (info_memory){ADDR_LOW_MEMORY,size_reserveMemory};
+	bootInfo += align(sizeof(info_memory),e)>>e;
+
+	*(bootInfo++) = (info_header){BOOTINFO_ACPI,1};
+	kmemcpy(bootInfo,(byte*)&ACPI,sizeof(ACPI));
+	bootInfo += align(sizeof(ACPI),e)>>e;
+
+	bootInfo->type = BOOTINFO_END;
+}
+
+
 void debug_output()
 {
 	DEBUG_BREAKPOINT;
@@ -437,7 +476,7 @@ void init_memory_(u32 magic,u32 mbi)
 			kputs("handled");
 			handle_tag[tag->type](tag);
 		}
-		tag=(struct multiboot_tag*)align((u32)tag+tag->size,__builtin_ctz(MULTIBOOT_INFO_ALIGN));
+		tag=(struct multiboot_tag*)align((u32)tag+tag->size,LOG2(MULTIBOOT_INFO_ALIGN));
 	}
 
 	// initialize all page settings (the allocation will happens later)
@@ -448,13 +487,24 @@ void init_memory_(u32 magic,u32 mbi)
 	load_module();
 
 	// preparing the information passing to the `control` module
-	kmemset(bootInfo, 0, 1024);
-	// bootInfo[0..3]: size_reserveMemory
-	*(u32*)&bootInfo[0] = size_reserveMemory;
+	init_bootInfo();
 
 	// enable pages
 	init_page_temp();
 	enable_page();
+
+	// Change stack pointer to the high memory area
+	asm volatile(
+		"addl %0, %%esp\n\t"
+		"addl %0, %%ebp\n\t"
+	::
+		"i"(ADDR_HIGH_MEMORY-ADDR_LOW_MEMORY)
+	:
+		"esp"
+	);
+
+	kputs("Ready to jump");
+	DEBUG_BREAKPOINT;
 	kernelCallTable[MODULE_TYPE_CONTROL](KERNEL_CALL_INIT); // let's get kernel started
 }
 

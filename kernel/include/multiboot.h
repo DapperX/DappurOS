@@ -32,7 +32,7 @@
 /* Alignment of multiboot modules. */
 #define MULTIBOOT_MOD_ALIGN (0x00001000)
 /* Alignment of the multiboot info structure. */
-#define MULTIBOOT_INFO_ALIGN (0x00000008)
+#define MULTIBOOT_INFO_ALIGN 8
 /* Flags set in the ’flags’ member of the multiboot header. */
 #define MULTIBOOT_TAG_ALIGN (8)
 #define MULTIBOOT_TAG_TYPE_END (0)
