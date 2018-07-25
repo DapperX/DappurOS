@@ -1,7 +1,9 @@
 #ifndef _KERNEL_H
 #define _KERNEL_H
 
-#define KERNEL_VERSION "0.0.1"
+#include "macro.h"
+
+#define KERNEL_VERSION "0.1.0"
 
 // for now only support at most 3.75GB address
 // just be convenient to avoid special memory area such as SLIC
@@ -21,7 +23,12 @@
 #define INT_LEGENCY 0x82
 #define INT_MODULE 0xA0
 
-typedef int_var (*kernelCall)(u32 index, ...);
+#define SIZE_POINTER 4
+
+typedef uint_var (*kernelCall)(u32 index, ...);
+typedef void (*kernelCall_noret)(u32 index, ...);
+typedef uint_var (*kernelCall_noarg)();
+
 typedef struct{
 	u32 funcId;
 	char *name;
@@ -31,8 +38,8 @@ typedef struct{
 	u32 cnt;
 }info_header;
 typedef struct{
-	u64 start;
-	u64 len;
+	u64 begin;
+	u64 end;
 }info_memory;
 typedef struct{
 	u64 start;
@@ -53,26 +60,29 @@ typedef struct{
 
 #define MODULE_TYPE_CONTROL 0
 #define MODULE_TYPE_MM 1
-#define MODULE_TYPE_PROCESS 2
-#define MODULE_TYPE_FS 3
+#define MODULE_TYPE_FS 2
+#define MODULE_TYPE_PROCESS 3
 
 #define TEMPLATE_CALL_DISTRIBUTE(callList) {\
+	asm volatile( \
 	/* 恢复堆栈至进入本函数前的状态 */\
 	/* recover stack back to the status before entering this function */\
-	asm volatile("leave"); \
-	/* remove parameter `index` */\
-	asm volatile( \
-		"pop	%eax\n\t" \
-		"movl	(%esp), %edx\n\t" \
-		"movl	%eax, (%esp)\n\t" \
-	); \
-	asm volatile( \
-		"shll	$2, %%edx\n\t" \
-		"addl	%%edx, %%eax\n\t" \
-		"jmp	(%%eax)" \
+		"leave\n\t" \
+	/* then remove parameter `index` */\
+	/* pop the return address to `eax` */\
+		"pop	%%eax\n\t" \
+	/* save the first argument to `edx` */\
+		"movl	(%%esp), %%edx\n\t" \
+	/* replace it with the return address */\
+		"movl	%%eax, (%%esp)\n\t" \
+	/* calculate the jump address */\
+		"shll	%1, %%edx\n\t" \
+		"addl	%0, %%edx\n\t" \
+		"jmp	*(%%edx)\n\t" \
+	:: \
+		"b"(callList),"i"(LOG2(SIZE_POINTER)) \
 	: \
-	: \
-		"a"(callList) \
+		"eax","edx","esp","memory" \
 	); \
 }
 

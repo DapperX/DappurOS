@@ -3,13 +3,13 @@
 #include "memory.h"
 #include "assert.h"
 #include "debug.h"
-#include "page.h"
+#include "arch/x86/page.h"
 #include "kernel.h"
 #include "init_mem.h"
 
 u32 *const pageDirectory = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_DIRECTORY);
 kernelCall *const kernelCallTable = (kernelCall*)(ADDR_HIGH_MEMORY+OFFSET_KCT);
-static kernelCall callList[];
+static kernelCall_noarg callList[];
 
 #define CNT_MEM_TOTAL 4
 u32 cnt_mem_total = 0;
@@ -22,21 +22,32 @@ static inline u32 align(u32 val,u32 bit)
 	return (val+mask)&(~mask);
 }
 
-int_var load_module(char *moduleName)
+uint_var load_module(char *moduleName)
 {
 	DISABLE(moduleName);
 	return 0;
 }
 
-int_var unload_module(u32 moduleId)
+uint_var unload_module(u32 moduleId)
 {
 	DISABLE(moduleId);
 	return 0;
 }
 
-int_var module_init()
+void init_IDT()
+{
+	kmemset((byte*)(ADDR_HIGH_MEMORY+OFFSET_IDT),0,2048);
+}
+
+void init_clock()
+{
+
+}
+
+uint_var module_init()
 {
 	u32 canary = 0xDEADBEEF;
+	kcls();
 	kputs("[Control] Initializing...");
 	
 	u32 offset_available = 0;
@@ -63,7 +74,7 @@ int_var module_init()
 			case BOOTINFO_MEM_USED:
 			{
 				info_memory *last = &((info_memory*)(bootInfo+1))[bootInfo->cnt-1];
-				offset_available = (u32)(last->start+last->len-ADDR_LOW_MEMORY); // $unsafe$
+				offset_available = (u32)(last->end-ADDR_LOW_MEMORY); // $unsafe$
 				bootInfo += 1+(align(sizeof(info_memory)*bootInfo->cnt,e)>>e);
 				break;
 			}
@@ -75,12 +86,10 @@ int_var module_init()
 
 	if(cnt_mem_total==0 || offset_available==0)
 	{
-		kputs("Warning: critical bootInfo not found");
+		kputs("Error: critical bootInfo not found");
 		HALT;
 	}
-
 	kprintf("offset_available: %u\n",offset_available);
-	DEBUG_BREAKPOINT;
 
 	// Clear the temporary page mapping (low memory areas)
 	pageDirectory[0] = 0;
@@ -114,16 +123,22 @@ int_var module_init()
 	:
 		"esp"
 	);
-
 	kprintf("canary: %x\n",canary);
 	DEBUG_BREAKPOINT;
+
+	init_IDT();
+	init_clock();
 
 	// Initialize loaded modules
 	for(u32 i=0;i<LEN_ARRAY(module_preload);++i)
 	{
-		KASSERT(kernelCallTable[i]);
-		kernelCallTable[i](KERNEL_CALL_INIT);
+		KASSERT(kernelCallTable[module_preload[i]]);
+		kernelCallTable[module_preload[i]](KERNEL_CALL_INIT);
 	}
+
+	kprintf("Done");
+	HALT;
+
 	for(u32 i=0;i<LEN_ARRAY(module_need_load);++i)
 	{
 		load_module(module_need_load[i]);
@@ -132,23 +147,30 @@ int_var module_init()
 	return 0;
 }
 
-int_var module_exit()
+uint_var module_exit()
 {
 	return 0;
 }
 
-static kernelCall callList[]={
-	[0]=(kernelCall)module_init,
-	[1]=(kernelCall)module_exit,
-	[8]=(kernelCall)load_module,
-	[9]=(kernelCall)unload_module
+uint_var get_memory_total(const info_memory **p)
+{
+	*p = mem_total;
+	return cnt_mem_total;
+}
+
+static kernelCall_noarg callList[]={
+	[0]=(kernelCall_noarg)module_init,
+	[1]=(kernelCall_noarg)module_exit,
+	[8]=(kernelCall_noarg)load_module,
+	[9]=(kernelCall_noarg)unload_module,
+	[12]=(kernelCall_noarg)get_memory_total,
+	[16]=(kernelCall_noarg)kprintf
 };
 
-int_var module_kernelCall(u32 index,...)
+void module_kernelCall(u32 index,...)
 {
-	kcls();
-	kprintf("[Control] index: %d\n",index);
-	KASSERT(index<KERNEL_CALL_SELF_DEFINED+LEN_ARRAY(callList));
+//	kprintf("[Control] index: %d\n",index);
+	KASSERT(index<LEN_ARRAY(callList));
 	KASSERT(callList[index]);
 	TEMPLATE_CALL_DISTRIBUTE(callList);
 }

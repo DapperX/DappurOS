@@ -2,21 +2,23 @@
 #include "assert.h"
 
 kernelCall *const kernelCallTable=(kernelCall*)(OFFSET_KCT+ADDR_HIGH_MEMORY);
+static kernelCall_noarg callList[];
 
-int_var module_init()
+uint_var module_init()
 {
 }
 
-int_var module_exit()
+uint_var module_exit()
 {
 }
 
-int_var module_kernelCall(u32 index,...)
+static kernelCall_noarg callList[]={
+	[0]=(kernelCall_noarg)module_init,
+	[1]=(kernelCall_noarg)module_exit,
+};
+
+uint_var module_kernelCall(u32 index,...)
 {
-	static kernelCall callList[]={
-		[0]=(kernelCall)module_init,
-		[1]=(kernelCall)module_exit,
-	};
 	KASSERT(index>=KERNEL_CALL_SELF_DEFINED+LEN_ARRAY(callList));
 	KASSERT(callList[index]);
 	TEMPLATE_CALL_DISTRIBUTE(callList);

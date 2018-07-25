@@ -70,7 +70,7 @@ void handle_tag_mmap(struct multiboot_tag_mmap *tag)
 		{
 			kprintf("Avaliable memory %p:%p\n",(u32)entry->addr,(u32)(entry->addr+entry->len));
 			if(cnt_mem_total<CNT_MEM_TOTAL)
-				mem_total[cnt_mem_total++] = (info_memory){entry->addr,entry->len};
+				mem_total[cnt_mem_total++] = (info_memory){entry->addr,entry->addr+entry->len};
 		}
 	}
 }
@@ -85,16 +85,16 @@ void* get_page_free(const u32 cnt,const u32 is_writable)
 {
 	kprintf("get_page: %p %d\n",size_reserveMemory,cnt);
 	const u32 base = size_reserveMemory;
-	if(size_reserveMemory>1048576*1.75)
+	u32 mask = (!!is_writable)<<1;
+	for(u32 i=0;i<cnt;++i)
+	{
+		pageTable[size_reserveMemory>>12] = (ADDR_LOW_MEMORY+size_reserveMemory)|PTE_P|mask;
+		size_reserveMemory += (1<<12);
+	}
+	if(size_reserveMemory>0x200000)
 	{
 		kputs("Error: Init memory size is greater than 2MB");
 		HALT;
-	}
-	u32 mask_writable = (!!is_writable)<<1;
-	for(u32 i=0;i<cnt;++i)
-	{
-		pageTable[size_reserveMemory>>12] = (ADDR_LOW_MEMORY+size_reserveMemory)|PTE_P|mask_writable;
-		size_reserveMemory += (1<<12);
 	}
 	return (void*)(ADDR_LOW_MEMORY + base);
 }
@@ -223,12 +223,10 @@ void set_kernelCall(byte *const buffer)
 			if(!kstrcmp(&strtab[symtab[j].st_name],"module_kernelCall_index"))
 			{
 				kernelCall_index = symVal;
-				kprintf("kernelCall_index: %u\n",kernelCall_index);
 			}
 			if(!kstrcmp(&strtab[symtab[j].st_name],"module_kernelCall_entry"))
 			{
 				kernelCall_entry = (kernelCall)symVal;
-				kprintf("kernelCall_entry: %p\n",kernelCall_entry);
 			}
 		}
 		kprintf("KCL idx: %d\n", kernelCall_index);
@@ -414,7 +412,7 @@ void init_bootInfo()
 	bootInfo += align(sizeof(*mem_total)*cnt_mem_total,e)>>e;
 
 	*(bootInfo++) = (info_header){BOOTINFO_MEM_USED,1};
-	*(info_memory*)bootInfo = (info_memory){ADDR_LOW_MEMORY,size_reserveMemory};
+	*(info_memory*)bootInfo = (info_memory){ADDR_LOW_MEMORY,ADDR_LOW_MEMORY+size_reserveMemory};
 	bootInfo += align(sizeof(info_memory),e)>>e;
 
 	*(bootInfo++) = (info_header){BOOTINFO_ACPI,1};

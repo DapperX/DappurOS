@@ -2,7 +2,7 @@
 #define _INIT_H
 
 #include "base.h"
-#include "page.h"
+#include "arch/x86/page.h"
 #include "kernel.h"
 
 // the start of physical address of kernel
