@@ -1,6 +1,7 @@
 #include "control.h"
 #include "print.h"
 #include "memory.h"
+#include "macro.h"
 #include "assert.h"
 #include "debug.h"
 #include "arch/x86/page.h"
@@ -34,6 +35,60 @@ uint_var unload_module(u32 moduleId)
 	return 0;
 }
 
+u32 alloc_raw(u32 offset_available, u32 vaddr)
+{
+	u32 *const pageTable_init = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_INIT);
+	u32 *const pageTable_kernel = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_KERNEL);
+	u32 *const addr_PTE_kernel = &pageTable_kernel[(vaddr>>12)&(256*1024-1)];
+	u32 *const addr_PTE_init = &pageTable_init[((u32)addr_PTE_kernel>>12)&1023];
+
+	// Mapping the page for the new page table first
+	if(!(*addr_PTE_init&PTE_P))
+	{
+		*addr_PTE_init = (ADDR_LOW_MEMORY+offset_available)|PTE_P|PTE_R;
+		offset_available += 4096;
+		kmemset((byte*)((uint_var)addr_PTE_kernel&~4095u),0,4096);
+	}
+	pageDirectory[vaddr>>22] = ((*addr_PTE_init)&~4095u)|PDE_P|PDE_R;
+	*addr_PTE_kernel = (ADDR_LOW_MEMORY+offset_available)|PTE_P|PTE_R;
+	offset_available += 4096;
+	return offset_available;
+}
+
+void fix_page()
+{
+	u32 *const pageTable_init = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_INIT);
+	u32 *const pageTable_kernel = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_KERNEL);
+
+	// Clear the temporary page mapping (low memory areas)
+	pageDirectory[0] = 0;
+	// Clear the initial reserved area #1
+	kmemset((byte*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_INIT+2048),0,2048);
+	// Merge the init page table into the kernel page table
+	pageTable_init[((u32)&pageTable_kernel[0]>>12)&1023]
+		= pageTable_init[((ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_INIT)>>12)&1023];
+}
+
+u32 init_stack(u32 offset_available)
+{
+	// Allocate the kernel stack
+	offset_available = alloc_raw(offset_available,ADDR_STACK-4096);
+	// Transfer the stack to the formal position
+	kmemcpy((byte*)ADDR_STACK-1024,(byte*)ADDR_HIGH_MEMORY+OFFSET_GDT-1024,1024);
+	asm volatile(
+		"addl %0, %%esp\n\t"
+		"addl %0, %%ebp\n\t"
+	::
+		"i"(ADDR_STACK-(ADDR_HIGH_MEMORY+OFFSET_GDT))
+	:
+		"esp"
+	);
+	// Allocate the auxiliary stack
+	offset_available = alloc_raw(offset_available,ADDR_STACK);
+	*(u32*)ADDR_STACK = ADDR_STACK;
+	return offset_available;
+}
+
 void init_IDT()
 {
 	kmemset((byte*)(ADDR_HIGH_MEMORY+OFFSET_IDT),0,2048);
@@ -41,12 +96,10 @@ void init_IDT()
 
 void init_clock()
 {
-
 }
 
 uint_var module_init()
 {
-	u32 canary = 0xDEADBEEF;
 	kcls();
 	kputs("[Control] Initializing...");
 	
@@ -91,43 +144,16 @@ uint_var module_init()
 	}
 	kprintf("offset_available: %u\n",offset_available);
 
-	// Clear the temporary page mapping (low memory areas)
-	pageDirectory[0] = 0;
-	kmemset((byte*)ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_INIT+2048,0,2048);
-
-	// Initialize kernel stack
-	u32 *const pageTable_init = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_INIT);
-	u32 *const pageTable_kernel = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_KERNEL);
-	u32 *const addr_PTE_kernel = &pageTable_kernel[((ADDR_STACK-4096)>>12)&1023];
-	u32 *const addr_PTE_init = &pageTable_init[((u32)addr_PTE_kernel>>12)&1023];
-
-	// Mapping the page table entry
-	if(!(*addr_PTE_init&PTE_P))
-	{
-		*addr_PTE_init = (ADDR_LOW_MEMORY+offset_available)|PTE_P|PTE_R;
-		offset_available += 4096;
-		kmemset((byte*)((uint_var)addr_PTE_kernel&~4095u),0,4096);
-	}
-
-	pageDirectory[(ADDR_STACK-4096)>>22] = ((*addr_PTE_init)&~4095u)|PDE_P|PDE_R;
-	*addr_PTE_kernel = (ADDR_LOW_MEMORY+offset_available)|PTE_P|PTE_R;
-	offset_available += 4096;
-
-	// Transfer the stack to the formal position
-	kmemcpy((byte*)ADDR_STACK-1024,(byte*)ADDR_HIGH_MEMORY+OFFSET_GDT-1024,1024);
-	asm volatile(
-		"addl %0, %%esp\n\t"
-		"addl %0, %%ebp\n\t"
-	::
-		"i"(ADDR_STACK-(ADDR_HIGH_MEMORY+OFFSET_GDT))
-	:
-		"esp"
-	);
-	kprintf("canary: %x\n",canary);
-	DEBUG_BREAKPOINT;
+	fix_page();
+	offset_available = init_stack(offset_available);
+	// Once the auxiliary stack is ready, switch to the formal entry
+	kernelCallTable[MODULE_TYPE_CONTROL] = (kernelCall)module_kernelCall;
 
 	init_IDT();
 	init_clock();
+
+	kputs("Ready to init loaded modules");
+	DEBUG_BREAKPOINT;
 
 	// Initialize loaded modules
 	for(u32 i=0;i<LEN_ARRAY(module_preload);++i)
@@ -143,7 +169,6 @@ uint_var module_init()
 	{
 		load_module(module_need_load[i]);
 	}
-
 	return 0;
 }
 
@@ -159,18 +184,38 @@ uint_var get_memory_total(const info_memory **p)
 }
 
 static kernelCall_noarg callList[]={
-	[0]=(kernelCall_noarg)module_init,
-	[1]=(kernelCall_noarg)module_exit,
-	[8]=(kernelCall_noarg)load_module,
-	[9]=(kernelCall_noarg)unload_module,
-	[12]=(kernelCall_noarg)get_memory_total,
-	[16]=(kernelCall_noarg)kprintf
+	[KERNEL_CALL_INIT]=(kernelCall_noarg)module_init,
+	[KERNEL_CALL_EXIT]=(kernelCall_noarg)module_exit,
+	[KERNEL_CALL_SELF_DEFINED+0]=(kernelCall_noarg)load_module,
+	[KERNEL_CALL_SELF_DEFINED+1]=(kernelCall_noarg)unload_module,
+	[KERNEL_CALL_SELF_DEFINED+4]=(kernelCall_noarg)get_memory_total,
+	[KERNEL_CALL_SELF_DEFINED+8]=(kernelCall_noarg)kprintf
 };
 
-void module_kernelCall(u32 index,...)
+__attribute__((optimize("-O0"))) void module_kernelCall(u32 index,...)
 {
 //	kprintf("[Control] index: %d\n",index);
 	KASSERT(index<LEN_ARRAY(callList));
 	KASSERT(callList[index]);
-	TEMPLATE_CALL_DISTRIBUTE(callList);
+	CALL_INPLACE(callList[index],4);
+}
+
+// This function is only used for being called by `init`,
+// as the auxiliary stack was not prepared yet.
+void module_kernelCall_init(u32 index,...)
+{
+	KASSERT(index==KERNEL_CALL_INIT);
+	asm volatile(
+	/* recover `esp` and `ebp` */
+		"leave\n\t"
+	/* pop the return address to `ecx` */
+		"pop	%%ecx\n\t"
+	/* remove `index` and fix the return address */
+		"movl	%%ecx, (%%esp)\n\t"
+		"jmp	*%%eax\n\t"
+	::
+		"a"(callList[index])
+	:
+		"ecx","esp","memory"
+	);
 }

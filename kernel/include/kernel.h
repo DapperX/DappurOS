@@ -16,7 +16,7 @@
 #define OFFSET_GDT 0x2800
 #define OFFSET_LDT 0x2880
 #define OFFSET_KCT 0x2900
-#define ADDR_STACK 0xe0000000
+#define ADDR_STACK 0xf0000000
 
 #define INT_LINUX 0x80
 #define INT_DEBUG 0x81
@@ -62,28 +62,5 @@ typedef struct{
 #define MODULE_TYPE_MM 1
 #define MODULE_TYPE_FS 2
 #define MODULE_TYPE_PROCESS 3
-
-#define TEMPLATE_CALL_DISTRIBUTE(callList) {\
-	asm volatile( \
-	/* 恢复堆栈至进入本函数前的状态 */\
-	/* recover stack back to the status before entering this function */\
-		"leave\n\t" \
-	/* then remove parameter `index` */\
-	/* pop the return address to `eax` */\
-		"pop	%%eax\n\t" \
-	/* save the first argument to `edx` */\
-		"movl	(%%esp), %%edx\n\t" \
-	/* replace it with the return address */\
-		"movl	%%eax, (%%esp)\n\t" \
-	/* calculate the jump address */\
-		"shll	%1, %%edx\n\t" \
-		"addl	%0, %%edx\n\t" \
-		"jmp	*(%%edx)\n\t" \
-	:: \
-		"b"(callList),"i"(LOG2(SIZE_POINTER)) \
-	: \
-		"eax","edx","esp","memory" \
-	); \
-}
 
 #endif //_KERNEL_H

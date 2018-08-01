@@ -1,6 +1,8 @@
 #ifndef _MACRO_H
 #define _MACRO_H
 
+#include "kernel.h"
+
 #define LOG2_1 0
 #define LOG2_2 1
 #define LOG2_4 2
@@ -35,5 +37,40 @@
 #define LOG2_2147483648 31
 #define _LOG2(x) LOG2_##x
 #define LOG2(x) _LOG2(x)
+
+#define CALL_INPLACE(target,offset_arg) {\
+	asm volatile( \
+	/* 恢复堆栈至进入本函数前的状态 */\
+	/* recover stack back to the status before entering this function */\
+		"leave\n\t" \
+	/* pop the return address to `ecx` */\
+		"pop	%%ecx\n\t" \
+	/* store it to the auxiliary stack*/\
+		"movl	%1, %%eax\n\t"\
+		"movl	(%%eax), %%eax\n\t"\
+		"addl	$4, %%eax\n\t"\
+		"movl	%%ecx, (%%eax)\n\t"\
+		"movl	%1, %%ecx\n\t"\
+		"movl	%%eax, (%%ecx)\n\t"\
+	/* set `esp` to the position of the first argument  */\
+		"addl	%2, %%esp\n\t"\
+	/* go to the target address */\
+		"call	*%0\n\t" \
+	/* recover `esp` from the extra offset */\
+		"subl	%2, %%esp\n\t"\
+	/* restore the return address */\
+		"movl	%1, %%edx\n\t"\
+		"movl	(%%edx), %%edx\n\t"\
+		"pushl	(%%edx)\n\t"\
+		"subl	$4, %%edx\n\t"\
+		"movl	%1, %%ecx\n\t"\
+		"movl	%%edx, (%%ecx)\n\t"\
+		"ret\n\t"\
+	:: \
+		"d"(target),"i"(ADDR_STACK),"i"(offset_arg) \
+	: \
+		"eax","ecx","esp","memory" \
+	); \
+}
 
 #endif //_MACRO_H

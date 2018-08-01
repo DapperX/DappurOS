@@ -378,9 +378,8 @@ void init_page_temp()
 	// 0:ADDR_LOW_MEMORY+size_reserveMemory -> 0:ADDR_LOW_MEMORY+size_reserveMemory
 	u32 *const pageTable_temp = (u32*)(ADDR_LOW_MEMORY+size_reserveMemory);
 
-	const u32 cnt_PDE = align(ADDR_LOW_MEMORY+size_reserveMemory,22)>>22;
-	for(register u32 i=0;i<cnt_PDE;++i)
-		pageDirectory[i] = (u32)&pageTable_temp[i*1024]|PDE_P|PDE_R;
+	// Under the limit that size_reserveMemory<= 2MB, only the first entry will be used
+	pageDirectory[0] = (u32)&pageTable_temp[0]|PDE_P|PDE_R;
 
 	const u32 cnt_PTE = (ADDR_LOW_MEMORY+size_reserveMemory)>>12;
 	for(register u32 i=0;i<cnt_PTE;++i)

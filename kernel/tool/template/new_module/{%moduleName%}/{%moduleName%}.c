@@ -1,4 +1,5 @@
 #include "{%moduleName%}.h"
+#include "macro.h"
 #include "assert.h"
 
 kernelCall *const kernelCallTable=(kernelCall*)(ADDR_KCT+OFFSET_HIGH_MEMORY);

@@ -19,7 +19,7 @@ inline void write_video(i32 pos,char c,char color)
 
 void kcls()
 {
-	for(i32 i=0;i<CNT_COLUMN*CNT_ROW*2;++i) write_video(i,0,COLOR_WB);
+	for(i32 i=0;i<CNT_COLUMN*CNT_ROW*2;i+=2) write_video(i,0,COLOR_WB);
 
 	xpos=0,ypos=0,offset_column=0;
 }
