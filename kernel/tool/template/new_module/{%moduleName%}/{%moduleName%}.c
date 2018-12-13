@@ -4,15 +4,15 @@
 
 kernelCall *const kernelCallTable=(kernelCall*)(ADDR_KCT+OFFSET_HIGH_MEMORY);
 
-int_var module_init()
+isize module_init()
 {
 }
 
-int_var module_exit()
+isize module_exit()
 {
 }
 
-int_var module_kernelCall(u32 index,...)
+isize module_kernelCall(u32 index,...)
 {
 	static kernelCall callList[]={
 		[0]=(kernelCall)module_init,

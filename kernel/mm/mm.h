@@ -4,15 +4,15 @@
 #include "base.h"
 #include "kernel.h"
 
-static uint_var module_init();
-static uint_var module_exit();
+static usize module_init();
+static usize module_exit();
 
 /*
 	kernelCall (index starts from KERNEL_CALL_SELF_DEFINED)
 */
-void module_kernelCall(u32 index,...);
+KCALL_DISPATCH usize module_kernelCall(u32 funct);
 
-u32 module_kernelCall_index=MODULE_TYPE_MM;
-kernelCall module_kernelCall_entry=(kernelCall)module_kernelCall;
+u32 module_kernelCall_index = MODULE_TYPE_MM;
+kCall_dispatch module_kernelCall_entry = module_kernelCall;
 
 #endif //_MM_H

@@ -15,7 +15,7 @@
 
 u32 *const pageDirectory=(u32*)(ADDR_LOW_MEMORY + OFFSET_PAGE_DIRECTORY);
 u32 *const pageTable=(u32*)(ADDR_LOW_MEMORY + OFFSET_PAGE_DIRECTORY + 4096);
-kernelCall *const kernelCallTable=(kernelCall*)(ADDR_LOW_MEMORY + OFFSET_KCT);
+kCall_dispatch *const kernelCallTable=(kCall_dispatch*)(ADDR_LOW_MEMORY + OFFSET_KCT);
 
 #define CNT_MODULE 10
 u32 cnt_module = 0;
@@ -216,7 +216,7 @@ void set_kernelCall(byte *const buffer)
 		char *strtab=(char*)&buffer[section[section[i].sh_link].sh_offset];
 
 		u32 kernelCall_index=0;
-		kernelCall kernelCall_entry = NULL;		
+		kCall_dispatch kernelCall_entry = NULL;		
 		for(u32 j=0;j<cnt_symtab;++j)
 		{
 			u32 symVal=*(u32*)&buffer[section[symtab[j].st_shndx].sh_offset+symtab[j].st_value];
@@ -226,7 +226,7 @@ void set_kernelCall(byte *const buffer)
 			}
 			if(!kstrcmp(&strtab[symtab[j].st_name],"module_kernelCall_entry"))
 			{
-				kernelCall_entry = (kernelCall)symVal;
+				kernelCall_entry = (kCall_dispatch)symVal;
 			}
 		}
 		kprintf("KCL idx: %d\n", kernelCall_index);
@@ -502,7 +502,7 @@ void init_memory_(u32 magic,u32 mbi)
 
 	kputs("Ready to jump");
 	DEBUG_BREAKPOINT;
-	kernelCallTable[MODULE_TYPE_CONTROL](KERNEL_CALL_INIT); // let's get kernel started
+	((kCall_dispatch_2)kernelCallTable[MODULE_TYPE_CONTROL])(KERNEL_CALL_INIT); // let's get kernel started
 }
 
 

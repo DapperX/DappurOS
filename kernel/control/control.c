@@ -9,8 +9,8 @@
 #include "init_mem.h"
 
 u32 *const pageDirectory = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_DIRECTORY);
-kernelCall *const kernelCallTable = (kernelCall*)(ADDR_HIGH_MEMORY+OFFSET_KCT);
-static kernelCall_noarg callList[];
+kCall_dispatch *const kernelCallTable = (kCall_dispatch*)(ADDR_HIGH_MEMORY+OFFSET_KCT);
+static kernelCall callList[];
 
 #define CNT_MEM_TOTAL 4
 u32 cnt_mem_total = 0;
@@ -23,13 +23,13 @@ static inline u32 align(u32 val,u32 bit)
 	return (val+mask)&(~mask);
 }
 
-uint_var load_module(char *moduleName)
+usize load_module(char *moduleName)
 {
 	DISABLE(moduleName);
 	return 0;
 }
 
-uint_var unload_module(u32 moduleId)
+usize unload_module(u32 moduleId)
 {
 	DISABLE(moduleId);
 	return 0;
@@ -47,7 +47,7 @@ u32 alloc_raw(u32 offset_available, u32 vaddr)
 	{
 		*addr_PTE_init = (ADDR_LOW_MEMORY+offset_available)|PTE_P|PTE_R;
 		offset_available += 4096;
-		kmemset((byte*)((uint_var)addr_PTE_kernel&~4095u),0,4096);
+		kmemset((byte*)((usize)addr_PTE_kernel&~4095u),0,4096);
 	}
 	pageDirectory[vaddr>>22] = ((*addr_PTE_init)&~4095u)|PDE_P|PDE_R;
 	*addr_PTE_kernel = (ADDR_LOW_MEMORY+offset_available)|PTE_P|PTE_R;
@@ -98,7 +98,7 @@ void init_clock()
 {
 }
 
-uint_var module_init()
+usize module_init()
 {
 	kcls();
 	kputs("[Control] Initializing...");
@@ -146,8 +146,6 @@ uint_var module_init()
 
 	fix_page();
 	offset_available = init_stack(offset_available);
-	// Once the auxiliary stack is ready, switch to the formal entry
-	kernelCallTable[MODULE_TYPE_CONTROL] = (kernelCall)module_kernelCall;
 
 	init_IDT();
 	init_clock();
@@ -159,7 +157,7 @@ uint_var module_init()
 	for(u32 i=0;i<LEN_ARRAY(module_preload);++i)
 	{
 		KASSERT(kernelCallTable[module_preload[i]]);
-		kernelCallTable[module_preload[i]](KERNEL_CALL_INIT);
+		KCALL(module_preload[i], KERNEL_CALL_INIT);
 	}
 
 	kprintf("Done");
@@ -172,50 +170,31 @@ uint_var module_init()
 	return 0;
 }
 
-uint_var module_exit()
+usize module_exit()
 {
 	return 0;
 }
 
-uint_var get_memory_total(const info_memory **p)
+usize get_memory_total(const info_memory **p)
 {
 	*p = mem_total;
 	return cnt_mem_total;
 }
 
-static kernelCall_noarg callList[]={
-	[KERNEL_CALL_INIT]=(kernelCall_noarg)module_init,
-	[KERNEL_CALL_EXIT]=(kernelCall_noarg)module_exit,
-	[KERNEL_CALL_SELF_DEFINED+0]=(kernelCall_noarg)load_module,
-	[KERNEL_CALL_SELF_DEFINED+1]=(kernelCall_noarg)unload_module,
-	[KERNEL_CALL_SELF_DEFINED+4]=(kernelCall_noarg)get_memory_total,
-	[KERNEL_CALL_SELF_DEFINED+8]=(kernelCall_noarg)kprintf
+static kernelCall callList[]={
+	[KERNEL_CALL_INIT]=(kernelCall)module_init,
+	[KERNEL_CALL_EXIT]=(kernelCall)module_exit,
+	[KERNEL_CALL_SELF_DEFINED+0]=(kernelCall)load_module,
+	[KERNEL_CALL_SELF_DEFINED+1]=(kernelCall)unload_module,
+	[KERNEL_CALL_SELF_DEFINED+4]=(kernelCall)get_memory_total,
+	[KERNEL_CALL_SELF_DEFINED+8]=(kernelCall)kprintf
 };
 
-__attribute__((optimize("-O0"))) void module_kernelCall(u32 index,...)
+KCALL_DISPATCH usize module_kernelCall(u32 funct)
 {
-//	kprintf("[Control] index: %d\n",index);
-	KASSERT(index<LEN_ARRAY(callList));
-	KASSERT(callList[index]);
-	CALL_INPLACE(callList[index],4);
-}
-
-// This function is only used for being called by `init`,
-// as the auxiliary stack was not prepared yet.
-void module_kernelCall_init(u32 index,...)
-{
-	KASSERT(index==KERNEL_CALL_INIT);
-	asm volatile(
-	/* recover `esp` and `ebp` */
-		"leave\n\t"
-	/* pop the return address to `ecx` */
-		"pop	%%ecx\n\t"
-	/* remove `index` and fix the return address */
-		"movl	%%ecx, (%%esp)\n\t"
-		"jmp	*%%eax\n\t"
-	::
-		"a"(callList[index])
-	:
-		"ecx","esp","memory"
-	);
+//	kprintf("[Control] funct: %d\n",funct);
+	KASSERT(funct<LEN_ARRAY(callList));
+	KASSERT(callList[funct]);
+	JMP_INPLACE(callList[funct]);
+	return 0;
 }

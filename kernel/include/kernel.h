@@ -25,10 +25,6 @@
 
 #define SIZE_POINTER 4
 
-typedef uint_var (*kernelCall)(u32 index, ...);
-typedef void (*kernelCall_noret)(u32 index, ...);
-typedef uint_var (*kernelCall_noarg)();
-
 typedef struct{
 	u32 funcId;
 	char *name;
@@ -45,6 +41,41 @@ typedef struct{
 	u64 start;
 	u64 len;
 }info_ACPI;
+
+#define KCALL_DISPATCH_PARM __attribute__((regparm(1)))
+#define KCALL_DISPATCH_OPT __attribute__((optimize("-O0")))
+#define KCALL_DISPATCH KCALL_DISPATCH_PARM KCALL_DISPATCH_OPT
+typedef KCALL_DISPATCH_PARM usize (*kCall_dispatch_2)(u32 funct);
+typedef KCALL_DISPATCH_PARM usize (*kCall_dispatch_3)(u32 funct, usize arg1);
+typedef KCALL_DISPATCH_PARM usize (*kCall_dispatch_4)(u32 funct, usize arg1, usize arg2);
+typedef KCALL_DISPATCH_PARM usize (*kCall_dispatch_5)(u32 funct, usize arg1, usize arg2, usize arg3);
+typedef KCALL_DISPATCH_PARM usize (*kCall_dispatch_6)(u32 funct, usize arg1, usize arg2, usize arg3, usize arg4);
+typedef KCALL_DISPATCH_PARM usize (*kCall_dispatch_7)(u32 funct, usize arg1, usize arg2, usize arg3, usize arg4, usize arg5);
+typedef KCALL_DISPATCH_PARM usize (*kCall_dispatch_8)(u32 funct, usize arg1, usize arg2, usize arg3, usize arg4, usize arg5, usize arg6);
+typedef kCall_dispatch_2 kCall_dispatch;
+typedef usize (*kCall_dispatch_legacy)(u32 funct, ...);
+typedef usize (*kernelCall)();
+
+#define KCALL_2()
+#define KCALL_3(arg) \
+	,(usize)arg
+#define KCALL_4(arg, ...) \
+	,(usize)arg KCALL_3(__VA_ARGS__)
+#define KCALL_5(arg, ...) \
+	,(usize)arg KCALL_4(__VA_ARGS__)
+#define KCALL_6(arg, ...) \
+	,(usize)arg KCALL_5(__VA_ARGS__)
+#define KCALL_7(arg, ...) \
+	,(usize)arg KCALL_6(__VA_ARGS__)
+#define KCALL_8(arg, ...) \
+	,(usize)arg KCALL_7(__VA_ARGS__)
+
+#define KCALL_(cntparm, index, funct, ...) \
+	((CAT(kCall_dispatch_,cntparm)*)(ADDR_HIGH_MEMORY+OFFSET_KCT))[index](funct CAT(KCALL_,cntparm)(__VA_ARGS__))
+#define KCALL(...) \
+	KCALL_(COUNT_PARM(__VA_ARGS__), __VA_ARGS__)
+#define KCALL_LEGACY(...) \
+	(kCall_dispatch_legacy)(ADDR_HIGH_MEMORY+OFFSET_KCT)(__VA_ARGS__)
 /*
 	kernelCall convention
 	0: module_init

@@ -4,8 +4,6 @@
 #ifndef NULL
 #define NULL ((void*)0)
 #endif
-#define STR(s) STR_(s)
-#define STR_(s) #s
 
 // `a` must be an array (CANNOT be a pointer)
 #define LEN_ARRAY(a) (sizeof(a)/sizeof(*(a)))
@@ -19,8 +17,8 @@ typedef unsigned char byte;
 // typedef long long int lli;
 // typedef unsigned long long int ull;
 
-typedef long int_var;
-typedef unsigned long uint_var;
+typedef long isize;
+typedef unsigned long usize;
 
 typedef signed char i8;
 typedef unsigned char u8;

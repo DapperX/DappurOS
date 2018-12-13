@@ -1,12 +1,10 @@
 #include "mm.h"
-#include "macro.h"
 #include "arch/x86/page.h"
 #include "memory.h"
 #include "assert.h"
 #include "debug.h"
 
-kernelCall *const kernelCallTable = (kernelCall*)(OFFSET_KCT+ADDR_HIGH_MEMORY);
-static kernelCall_noarg callList[];
+static kernelCall callList[];
 
 u32 *const pageDirectory = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_DIRECTORY);
 u32 *const pageTable_init = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_INIT);
@@ -29,7 +27,7 @@ static inline u32 align(u32 val,u32 bit)
 
 u32 layer_add(const u32 index, u32 page_begin, u32 cnt)
 {
-	kernelCallTable[MODULE_TYPE_CONTROL](KERNEL_CALL_SELF_DEFINED+8,
+	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8,
 		"[mm] layer_add %u %p %u\n",index,page_begin,cnt);
 
 //	struct mm_layer *layer = &list_layer[index];
@@ -42,10 +40,10 @@ u32 layer_add(const u32 index, u32 page_begin, u32 cnt)
 	return page_begin;
 }
 
-uint_var init_buddySystem()
+usize init_buddySystem()
 {
 	const info_memory *mem_total;
-	const u32 cnt_mem_total = (u32)kernelCallTable[MODULE_TYPE_CONTROL](KERNEL_CALL_SELF_DEFINED+4,&mem_total);
+	const u32 cnt_mem_total = (u32)KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+4,&mem_total);
 	u32 cnt_page_total = (u32)(mem_total[cnt_mem_total-1].end>>12);
 
 	// Settle pointers in the layer
@@ -84,7 +82,7 @@ uint_var init_buddySystem()
 			if((entry&PTE_P) && entry>paddr_last) paddr_last = entry;
 		}
 	}
-	kernelCallTable[MODULE_TYPE_CONTROL](KERNEL_CALL_SELF_DEFINED+8,
+	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8,
 		"paddr_last: %p\n",paddr_last);
 	DEBUG_BREAKPOINT;
 	*/
@@ -101,7 +99,7 @@ uint_var init_buddySystem()
 		{
 			*addr_PTE_init = (ADDR_LOW_MEMORY+offset_available)|PTE_P|PTE_R;
 			offset_available += 4096;
-			kmemset((byte*)((uint_var)addr_PTE_kernel&~4095u),0,4096);
+			kmemset((byte*)((usize)addr_PTE_kernel&~4095u),0,4096);
 		}
 
 		pageDirectory[(ADDR_STACK-4096)>>22] = ((*addr_PTE_init)&~4095u)|PDE_P|PDE_R;
@@ -115,7 +113,7 @@ uint_var init_buddySystem()
 		u32 page_begin = align((u32)mem_total[i].begin,12)>>12;
 		u32 page_end = (u32)mem_total[i].end>>12;
 
-		kernelCallTable[MODULE_TYPE_CONTROL](KERNEL_CALL_SELF_DEFINED+8,
+		KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8,
 			"%u:%u\n",page_begin,page_end);
 
 		// Align `page_begin` to some bound (up to 4K*2^CNT_LAYER = 4M)
@@ -131,7 +129,7 @@ uint_var init_buddySystem()
 		page_begin = layer_add(CNT_LAYER-1,page_begin,cnt_page>>(CNT_LAYER-1));
 		cnt_page &= ((1u<<(CNT_LAYER-1))-1);
 
-		kernelCallTable[MODULE_TYPE_CONTROL](KERNEL_CALL_SELF_DEFINED+8,
+		KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8,
 				"%u %p\n",cnt_page,page_begin<<12);
 
 		// Fill the rest of pages into the layer
@@ -145,7 +143,7 @@ uint_var init_buddySystem()
 	return 0;
 }
 
-uint_var module_init()
+usize module_init()
 {
 	/*
 		TODO:
@@ -156,19 +154,20 @@ uint_var module_init()
 	return 0;
 }
 
-uint_var module_exit()
+usize module_exit()
 {
 	return 0;
 }
 
-static kernelCall_noarg callList[]={
-	[KERNEL_CALL_INIT]=(kernelCall_noarg)module_init,
-	[KERNEL_CALL_EXIT]=(kernelCall_noarg)module_exit,
+static kernelCall callList[]={
+	[KERNEL_CALL_INIT]=(kernelCall)module_init,
+	[KERNEL_CALL_EXIT]=(kernelCall)module_exit,
 };
 
-void module_kernelCall(u32 index,...)
+KCALL_DISPATCH usize module_kernelCall(u32 funct)
 {
-	KASSERT(index<LEN_ARRAY(callList));
-	KASSERT(callList[index]);
-	CALL_INPLACE(callList[index],4);
+	KASSERT(funct<LEN_ARRAY(callList));
+	KASSERT(callList[funct]);
+	JMP_INPLACE(callList[funct]);
+	return 0;
 }
