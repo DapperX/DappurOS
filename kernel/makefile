@@ -9,7 +9,7 @@ export DIR_MAIN = $(shell pwd)
 export DIR_BIN = $(DIR_MAIN)/bin
 export DIR_LIB = $(DIR_MAIN)/lib
 export DIR_INCLUDE = $(DIR_MAIN)/include $(DIR_LIB)/include
-export DIR_IMG = /mnt
+export DIR_IMG = /mnt/DPOS
 export LIB = DPOS_main
 export PATH_LIB = $(patsubst %,$(DIR_LIB)/%,$(LIB:%=lib%.a))
 

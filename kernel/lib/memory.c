@@ -17,7 +17,7 @@ void* kmemcpy(void *dest,const void *src,usize size)
 	return dest;
 }
 
-void* kmemmove(void *dest,const void *src,usize size)
+void* kmemmove(void * dest,const void *src,usize size)
 {
 	asm volatile(
 		"movw	%%ds, %%ax\n\t"
@@ -47,4 +47,5 @@ void* kmemmove(void *dest,const void *src,usize size)
 	:::
 		"memory"
 	);
+	return dest;
 }

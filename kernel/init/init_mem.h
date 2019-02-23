@@ -6,7 +6,8 @@
 #include "kernel.h"
 
 // the start of physical address of kernel
-#define ADDR_LOW_MEMORY 0x100000
+#define ADDR_LOW_MEMORY 0x0
+#define OFFSET_MAPPING OFFSET_PAGE_DIRECTORY
 
 #define OFFSET_BOOTINFO OFFSET_IDT
 #define BOOTINFO_END 0

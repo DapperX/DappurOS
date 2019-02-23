@@ -1,5 +1,9 @@
-#ifndef _PAGE_H
-#define _PAGE_H 1
+#ifndef _ARCH_PAGE_H
+#define _ARCH_PAGE_H 1
+
+#define PAGE_BITWIDTH 12
+#define PAGE_SIZE (1<<PAGE_BITWIDTH)
+#define PAGE_
 
 // Present. If set, the page is actually in physical memory
 // If clear, processor ignores the rest of bites
@@ -40,4 +44,16 @@
 // Available. If set, it indicates the entry has used in special way(e.g. IO mapping) and cannot be modified
 #define RPE_A (1<<1)
 
-#endif // _PAGE_H
+static inline void arch_invalidate_page(u32 *vaddr)
+{
+	asm volatile(
+		"invlpg	(%0)\n\t"
+	:
+	:
+		"r"(vaddr)
+	:
+		"memory"
+	);
+}
+
+#endif // _ARCH_PAGE_H

@@ -7,14 +7,14 @@
 #include "string.h"
 #include "assert.h"
 #include "debug.h"
-#include "macro.h"
+#include "math.h"
 
-#define MEMORY_USED_INIT (12*1024)
+#define MEMORY_USED_INIT (0x100000+12*1024)
 #define ADDR_MBI (ADDR_LOW_MEMORY + OFFSET_PAGE_TABLE_INIT + 2048)
 #define ADDR_SEGMENT (ADDR_LOW_MEMORY + MEMORY_USED_INIT)
 
 u32 *const pageDirectory=(u32*)(ADDR_LOW_MEMORY + OFFSET_PAGE_DIRECTORY);
-u32 *const pageTable=(u32*)(ADDR_LOW_MEMORY + OFFSET_PAGE_DIRECTORY + 4096);
+u32 *const pageTable=(u32*)(ADDR_LOW_MEMORY + OFFSET_PAGE_TABLE_INIT);
 kCall_dispatch *const kernelCallTable=(kCall_dispatch*)(ADDR_LOW_MEMORY + OFFSET_KCT);
 
 #define CNT_MODULE 10
@@ -363,10 +363,11 @@ void init_pageDirectory()
 void init_pageTable()
 {
 	kmemset(pageTable, 0, 1024);
-	const u32 cnt_PTE = size_reserveMemory>>12;
+	const u32 page_start = OFFSET_MAPPING>>12;
+	const u32 page_end = size_reserveMemory>>12;
 	// ADDR_HIGH_MEMORY:ADDR_HIGH_MEMORY+size_reserveMemory -> ADDR_LOW_MEMORY:ADDR_LOW_MEMORY+size_reserveMemory
 	// i is the high 20bit of offset
-	for(register u32 i=0;i<cnt_PTE;++i)
+	for(register u32 i=page_start;i<page_end;++i)
 		pageTable[i] = (ADDR_LOW_MEMORY+(i<<12))|PTE_P|PTE_R;
 }
 
@@ -379,10 +380,11 @@ void init_page_temp()
 	u32 *const pageTable_temp = (u32*)(ADDR_LOW_MEMORY+size_reserveMemory);
 
 	// Under the limit that size_reserveMemory<= 2MB, only the first entry will be used
-	pageDirectory[0] = (u32)&pageTable_temp[0]|PDE_P|PDE_R;
+	pageDirectory[0] = (u32)pageTable_temp|PDE_P|PDE_R;
 
-	const u32 cnt_PTE = (ADDR_LOW_MEMORY+size_reserveMemory)>>12;
-	for(register u32 i=0;i<cnt_PTE;++i)
+	const u32 page_start = 0;
+	const u32 page_end = (ADDR_LOW_MEMORY+size_reserveMemory)>>12;
+	for(register u32 i=page_start;i<page_end;++i)
 		pageTable_temp[i] = (i<<12)|PTE_P|PTE_R;
 }
 
@@ -502,7 +504,7 @@ void init_memory_(u32 magic,u32 mbi)
 
 	kputs("Ready to jump");
 	DEBUG_BREAKPOINT;
-	((kCall_dispatch_2)kernelCallTable[MODULE_TYPE_CONTROL])(KERNEL_CALL_INIT); // let's get kernel started
+	((kCall_dispatch_3)kernelCallTable[MODULE_TYPE_CONTROL])(KERNEL_CALL_INIT,ADDR_HIGH_MEMORY+OFFSET_BOOTINFO); // let's get kernel started
 }
 
 

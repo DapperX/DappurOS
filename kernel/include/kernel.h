@@ -9,13 +9,13 @@
 // just be convenient to avoid special memory area such as SLIC
 #define MAX_MEMORY 0xf0000000
 #define ADDR_HIGH_MEMORY 0xc0000000
-#define OFFSET_PAGE_DIRECTORY 0x0
-#define OFFSET_PAGE_TABLE_INIT 0x1000
-#define OFFSET_PAGE_TABLE_KERNEL 0x200000
-#define OFFSET_IDT 0x2000
-#define OFFSET_GDT 0x2800
-#define OFFSET_LDT 0x2880
-#define OFFSET_KCT 0x2900
+#define OFFSET_PAGE_TABLE_KERNEL 0x0
+#define OFFSET_PAGE_DIRECTORY (OFFSET_PAGE_TABLE_KERNEL+0x100000)
+#define OFFSET_PAGE_TABLE_INIT (OFFSET_PAGE_DIRECTORY+0x1000)
+#define OFFSET_IDT (OFFSET_PAGE_TABLE_INIT+0x1000)
+#define OFFSET_GDT (OFFSET_IDT+0x800)
+#define OFFSET_LDT (OFFSET_GDT+0x80)
+#define OFFSET_KCT (OFFSET_LDT+0x80)
 #define ADDR_STACK 0xf0000000
 
 #define INT_LINUX 0x80
@@ -23,7 +23,7 @@
 #define INT_LEGENCY 0x82
 #define INT_MODULE 0xA0
 
-#define SIZE_POINTER 4
+// #define SIZE_POINTER 4
 
 typedef struct{
 	u32 funcId;
@@ -74,8 +74,11 @@ typedef usize (*kernelCall)();
 	((CAT(kCall_dispatch_,cntparm)*)(ADDR_HIGH_MEMORY+OFFSET_KCT))[index](funct CAT(KCALL_,cntparm)(__VA_ARGS__))
 #define KCALL(...) \
 	KCALL_(COUNT_PARM(__VA_ARGS__), __VA_ARGS__)
-#define KCALL_LEGACY(...) \
-	(kCall_dispatch_legacy)(ADDR_HIGH_MEMORY+OFFSET_KCT)(__VA_ARGS__)
+#define KCALL_LEGACY(index, ...) \
+	((kCall_dispatch_legacy*)(ADDR_HIGH_MEMORY+OFFSET_KCT))[index](__VA_ARGS__)
+
+#define KCALL_ERROR ((usize)~0u)
+
 /*
 	kernelCall convention
 	0: module_init
@@ -87,6 +90,7 @@ typedef usize (*kernelCall)();
 #define KERNEL_CALL_INIT 0
 #define KERNEL_CALL_EXIT 1
 #define KERNEL_CALL_GET_INFO 2
+#define KERNEL_CALL_VALIDITY 3
 #define KERNEL_CALL_SELF_DEFINED 8
 
 #define MODULE_TYPE_CONTROL 0

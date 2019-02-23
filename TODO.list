@@ -3,3 +3,4 @@ add the description of the status when jumping from `init`
 add more cmd parameters for nasm
 add the support for `.bss` segment for init loading
 fix all makefiles about lib path
+fix `end` field in `mem_info` may exceeds the range of u32

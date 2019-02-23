@@ -15,6 +15,7 @@ static kernelCall callList[];
 #define CNT_MEM_TOTAL 4
 u32 cnt_mem_total = 0;
 static info_memory mem_total[CNT_MEM_TOTAL];
+static info_memory mem_used_init = (info_memory){111ull, 222ull};
 
 // upper align `val` to multiple of 2**`bit`
 static inline u32 align(u32 val,u32 bit)
@@ -63,10 +64,10 @@ void fix_page()
 	// Clear the temporary page mapping (low memory areas)
 	pageDirectory[0] = 0;
 	// Clear the initial reserved area #1
-	kmemset((byte*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_INIT+2048),0,2048);
+	kmemset((byte*)pageTable_init+2048, 0, 2048);
 	// Merge the init page table into the kernel page table
 	pageTable_init[((u32)&pageTable_kernel[0]>>12)&1023]
-		= pageTable_init[((ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_INIT)>>12)&1023];
+		= pageTable_init[((u32)pageTable_init>>12)&1023];
 }
 
 u32 init_stack(u32 offset_available)
@@ -78,27 +79,46 @@ u32 init_stack(u32 offset_available)
 	asm volatile(
 		"addl %0, %%esp\n\t"
 		"addl %0, %%ebp\n\t"
+		"movl (%%ebp) ,%%eax\n\t"
+		"addl %0, %%eax\n\t"
+		"movl %%eax,(%%ebp)\n\t"
 	::
 		"i"(ADDR_STACK-(ADDR_HIGH_MEMORY+OFFSET_GDT))
 	:
-		"esp"
+		"esp","eax"
 	);
+	register u32 esp asm("esp");
+	register u32 ebp asm("ebp");
+	kprintf("esp: %p\n", esp);
+	kprintf("ebp: %p\n", ebp);
 	// Allocate the auxiliary stack
-	offset_available = alloc_raw(offset_available,ADDR_STACK);
-	*(u32*)ADDR_STACK = ADDR_STACK;
+	// offset_available = alloc_raw(offset_available,ADDR_STACK);
+	// *(u32*)ADDR_STACK = ADDR_STACK;
 	return offset_available;
 }
 
-void init_IDT()
+static void init_IDT()
 {
-	kmemset((byte*)(ADDR_HIGH_MEMORY+OFFSET_IDT),0,2048);
+	kmemset((byte*)(ADDR_HIGH_MEMORY+OFFSET_IDT), 0, 2048);
 }
 
-void init_clock()
+static void init_clock()
 {
 }
 
-usize module_init()
+usize kernelcall_dummy()
+{
+	u32 ret_addr;
+	asm volatile(
+		"mov	4(%%ebp),%0\n\t"
+	:
+		"=r"(ret_addr)
+	);
+	kprintf("Dummy Dummy Call from %p\n", ret_addr);
+	return 0;
+}
+
+usize module_init(info_header* bootInfo)
 {
 	kcls();
 	kputs("[Control] Initializing...");
@@ -106,7 +126,7 @@ usize module_init()
 	u32 offset_available = 0;
 
 	// Collect bootInfo
-	info_header *bootInfo = (info_header*)(ADDR_HIGH_MEMORY+OFFSET_BOOTINFO);
+	// info_header *bootInfo = (info_header*)(ADDR_HIGH_MEMORY+OFFSET_BOOTINFO);
 	while(bootInfo->type!=BOOTINFO_END)
 	{
 		static u32 e = __builtin_ctz(sizeof(info_header));
@@ -145,10 +165,15 @@ usize module_init()
 	kprintf("offset_available: %u\n",offset_available);
 
 	fix_page();
+	asm volatile("nop\n\tnop\n\tnop\n\t");
 	offset_available = init_stack(offset_available);
-
 	init_IDT();
 	init_clock();
+
+	mem_used_init = (info_memory){ADDR_LOW_MEMORY+OFFSET_MAPPING, offset_available};
+	kprintf("addr of oa :%p\n", &offset_available);
+	kprintf("addr of mui :%p\n", &mem_used_init);
+	asm volatile("nop\n\tnop\n\tnop\n\t");
 
 	kputs("Ready to init loaded modules");
 	DEBUG_BREAKPOINT;
@@ -163,6 +188,10 @@ usize module_init()
 	kprintf("Done");
 	HALT;
 
+	// Disable the functions only used for initializing loaded modules
+	callList[KERNEL_CALL_SELF_DEFINED+4] = (kernelCall)kernelcall_dummy;
+	callList[KERNEL_CALL_SELF_DEFINED+5] = (kernelCall)kernelcall_dummy;
+
 	for(u32 i=0;i<LEN_ARRAY(module_need_load);++i)
 	{
 		load_module(module_need_load[i]);
@@ -175,18 +204,38 @@ usize module_exit()
 	return 0;
 }
 
-usize get_memory_total(const info_memory **p)
+usize get_memory_total(const info_memory **const p)
 {
 	*p = mem_total;
 	return cnt_mem_total;
 }
 
-static kernelCall callList[]={
+usize get_memory_used_init(info_memory *const p)
+{
+	*p = mem_used_init;
+	return 0;
+}
+
+usize kernelCall_validity(const u32 index, const u32 funct, const bool valid)
+{
+	// KASSERT(funct<LEN_ARRAY(callList));
+	KASSERT(callList[funct]);
+	// Lacks of permission controlling for now
+	if(index!=module_kernelCall_index)
+		return KCALL(index, KERNEL_CALL_VALIDITY, funct, valid);
+	register usize old_flag = (usize)callList[index]&KERNEL_CALL_FLAG_INVALID;
+	callList[index] = (kernelCall)((usize)callList[index]&(valid?~KERNEL_CALL_FLAG_INVALID:KERNEL_CALL_FLAG_INVALID));
+	return old_flag;
+}
+
+static kernelCall callList[] = {
 	[KERNEL_CALL_INIT]=(kernelCall)module_init,
 	[KERNEL_CALL_EXIT]=(kernelCall)module_exit,
+	[KERNEL_CALL_VALIDITY]=(kernelCall)kernelCall_validity,
 	[KERNEL_CALL_SELF_DEFINED+0]=(kernelCall)load_module,
 	[KERNEL_CALL_SELF_DEFINED+1]=(kernelCall)unload_module,
 	[KERNEL_CALL_SELF_DEFINED+4]=(kernelCall)get_memory_total,
+	[KERNEL_CALL_SELF_DEFINED+5]=(kernelCall)get_memory_used_init,
 	[KERNEL_CALL_SELF_DEFINED+8]=(kernelCall)kprintf
 };
 
@@ -195,6 +244,7 @@ KCALL_DISPATCH usize module_kernelCall(u32 funct)
 //	kprintf("[Control] funct: %d\n",funct);
 	KASSERT(funct<LEN_ARRAY(callList));
 	KASSERT(callList[funct]);
+	// KASSERT(!((usize)(callList[funct])&KERNEL_CALL_FLAG_INVALID));
 	JMP_INPLACE(callList[funct]);
 	return 0;
 }
