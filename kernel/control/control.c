@@ -74,23 +74,31 @@ u32 init_stack(u32 offset_available)
 {
 	// Allocate the kernel stack
 	offset_available = alloc_raw(offset_available,ADDR_STACK-4096);
+
+	// Backtrace the whole stack to modify all stored EBPs
+	u32 *ebp;
+	asm volatile("movl %%ebp, %0":"=r"(ebp));
+	while(ebp>=(u32*)ADDR_HIGH_MEMORY)
+	{
+		u32 ebp_old = *ebp;
+		*ebp += ADDR_STACK-(ADDR_HIGH_MEMORY+OFFSET_GDT);
+		ebp = (u32*)ebp_old;
+	}
+
 	// Transfer the stack to the formal position
 	kmemcpy((byte*)ADDR_STACK-1024,(byte*)ADDR_HIGH_MEMORY+OFFSET_GDT-1024,1024);
+
+	// Since the compiler doesn't allow to declare using EBP in asm,
+	// the following code that modifies EBP register should be left at the end of the function,
+	// to avoid unexpected behaviors due to the optimization.
 	asm volatile(
 		"addl %0, %%esp\n\t"
 		"addl %0, %%ebp\n\t"
-		"movl (%%ebp) ,%%eax\n\t"
-		"addl %0, %%eax\n\t"
-		"movl %%eax,(%%ebp)\n\t"
 	::
 		"i"(ADDR_STACK-(ADDR_HIGH_MEMORY+OFFSET_GDT))
 	:
-		"esp","eax"
+		"esp"
 	);
-	register u32 esp asm("esp");
-	register u32 ebp asm("ebp");
-	kprintf("esp: %p\n", esp);
-	kprintf("ebp: %p\n", ebp);
 	// Allocate the auxiliary stack
 	// offset_available = alloc_raw(offset_available,ADDR_STACK);
 	// *(u32*)ADDR_STACK = ADDR_STACK;
