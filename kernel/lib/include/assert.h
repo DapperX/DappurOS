@@ -2,6 +2,7 @@
 #define _ASSERT_H
 
 #include "base.h"
+#include "print.h"
 
 #ifdef NDEBUG
 #define KASSERT(cond,...) ((void)0)
@@ -12,8 +13,9 @@
 
 static void kassert_(char* msg,int number,...)
 {
-	DISABLE(msg);
-	DISABLE(number);
+	// DISABLE(msg);
+	// DISABLE(number);
+	kprintf("ASSERT %s, %u\n", msg, number);
 
 	asm volatile("cli\t\n");
 	asm volatile("hlt\t\n");

@@ -2,8 +2,14 @@
 #define _ARCH_PAGE_H 1
 
 #define PAGE_BITWIDTH 12
-#define PAGE_SIZE (1<<PAGE_BITWIDTH)
-#define PAGE_
+#define PAGE_SIZE (1u<<PAGE_BITWIDTH)
+#define PAGE_MASK (PAGE_SIZE-1)
+#define PGDIR_BITWIDTH 10
+#define PGDIR_SIZE (1u<<PGDIR_BITWIDTH)
+#define PGDIR_MASK (PGDIR_SIZE-1)
+#define PGTBL_BITWIDTH 10
+#define PGTBL_SIZE (1u<<PGTBL_BITWIDTH)
+#define PGTBL_MASK (PGTBL_SIZE-1)
 
 // Present. If set, the page is actually in physical memory
 // If clear, processor ignores the rest of bites

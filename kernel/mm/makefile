@@ -1,3 +1,5 @@
+DIR_INCLUDE += $(DIR_MAIN)/init
+
 include $(DIR_MAIN)/tool/template/compile_with_dependence.makefile
 
 ASMFLAG += $(DIR_INCLUDE:%=-i%/)

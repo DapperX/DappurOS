@@ -43,7 +43,7 @@ static inline usize log2i(const usize x)
 	return sizeof(x)*8-1-(usize)__builtin_clz(x);
 }
 
-static inline usize round_ceil(const usize x, const usize y)
+static inline usize div_ceil(const usize x, const usize y)
 {
 	return (x+y-1)/y;
 }

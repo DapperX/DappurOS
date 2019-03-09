@@ -173,15 +173,11 @@ usize module_init(info_header* bootInfo)
 	kprintf("offset_available: %u\n",offset_available);
 
 	fix_page();
-	asm volatile("nop\n\tnop\n\tnop\n\t");
 	offset_available = init_stack(offset_available);
 	init_IDT();
 	init_clock();
 
-	mem_used_init = (info_memory){ADDR_LOW_MEMORY+OFFSET_MAPPING, offset_available};
-	kprintf("addr of oa :%p\n", &offset_available);
-	kprintf("addr of mui :%p\n", &mem_used_init);
-	asm volatile("nop\n\tnop\n\tnop\n\t");
+	mem_used_init = (info_memory){ADDR_LOW_MEMORY+OFFSET_MAPPING, ADDR_LOW_MEMORY+offset_available};
 
 	kputs("Ready to init loaded modules");
 	DEBUG_BREAKPOINT;

@@ -43,8 +43,8 @@ typedef struct{
 }info_ACPI;
 
 #define KCALL_DISPATCH_PARM __attribute__((regparm(1)))
-#define KCALL_DISPATCH_OPT __attribute__((optimize("-O0")))
-#define KCALL_DISPATCH KCALL_DISPATCH_PARM KCALL_DISPATCH_OPT
+#define KCALL_DISPATCH_NOOPT __attribute__((optimize("-O0")))
+#define KCALL_DISPATCH KCALL_DISPATCH_PARM KCALL_DISPATCH_NOOPT
 typedef KCALL_DISPATCH_PARM usize (*kCall_dispatch_2)(u32 funct);
 typedef KCALL_DISPATCH_PARM usize (*kCall_dispatch_3)(u32 funct, usize arg1);
 typedef KCALL_DISPATCH_PARM usize (*kCall_dispatch_4)(u32 funct, usize arg1, usize arg2);

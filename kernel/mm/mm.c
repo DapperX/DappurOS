@@ -4,6 +4,7 @@
 #include "assert.h"
 #include "math.h"
 #include "debug.h"
+#include "init_mem.h"
 
 static kernelCall callList[];
 
@@ -35,77 +36,81 @@ void TLB_invalidate_page(u32 *pgdir, u32 *vaddr)
 u32 layer_add(const u32 index, u32 page_begin, u32 cnt)
 {
 	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8,
-		"[mmx] layer_addx %u %p %u\n",index,page_begin,cnt);
+		"[mm] layer_add %u %p %u\n",index,page_begin,cnt);
 
-//	struct mm_layer *layer = &list_layer[index];
+	struct mm_layer *layer = &list_layer[index];
 	while(cnt--)
 	{
-	//	layer->stack[layer->stack_top++] = page_begin<<PAGE_BITWIDTH;
-	//	layer->bitmap_instack[page_begin>>index>>3] |= 1u<<((page_begin>>index)&7);
+		layer->stack[layer->stack_top++] = page_begin<<PAGE_BITWIDTH;
+		layer->bitmap_present[page_begin>>index>>3] |= 1u<<((page_begin>>index)&7);
+		layer->bitmap_instack[page_begin>>index>>3] |= 1u<<((page_begin>>index)&7);
 		page_begin += 1u<<index;
 	}
 	return page_begin;
 }
 
-usize init_buddySystem()
+usize buddySystem_init()
 {
-	const info_memory *mem_total;
+	const info_memory *mem_total, mem_used_init;
 	const u32 cnt_mem_total = (u32)KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+4, &mem_total);
+	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+5, &mem_used_init);
 	u32 cnt_page_total = (u32)(mem_total[cnt_mem_total-1].end>>PAGE_BITWIDTH);
 
-	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8, "init_buddySystem\n");
+	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8, "buddySystem_init\n");
+	u32 begin = (u32)mem_used_init.begin;
+	u32 end = (u32)(u32)mem_used_init.end;
+	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8,
+		"mem_used_init: %p:%p\n", begin, end);
+	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8, "cnt_page_total: %u\n", cnt_page_total);
 
 	// Settle pointers in the layer
-	byte *address = (byte*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_KERNEL+0x100000);
+	// [Assumption] The memory area following the used ones is available.
+	byte *address = (byte*)mem_used_init.end-ADDR_LOW_MEMORY+ADDR_HIGH_MEMORY;
 	for(u32 i=0;i<CNT_LAYER;++i)
 	{
 		struct mm_layer *layer = &list_layer[i];
 		layer->stack_top = 0;
 		address = (byte*)align((usize)address, log2i(sizeof(*layer->stack)));
 		layer->stack = (void*)address;
-		address += cnt_page_total>>i;
+		address += (cnt_page_total>>i)*sizeof(*layer->stack);
 		address = (byte*)align((usize)address, log2i(sizeof(*layer->bitmap_present)));
 		layer->bitmap_present = (void*)address;
-		address += round_ceil((cnt_page_total)>>i, sizeof(*layer->bitmap_present)*8);
+		address += div_ceil(cnt_page_total>>i, sizeof(*layer->bitmap_present)*8)*sizeof(*layer->bitmap_present);
 		address = (byte*)align((usize)address, log2i(sizeof(*layer->bitmap_instack)));
 		layer->bitmap_instack = (void*)address;
-		address += round_ceil((cnt_page_total)>>i, sizeof(*layer->bitmap_instack)*8);
+		address += div_ceil(cnt_page_total>>i, sizeof(*layer->bitmap_instack)*8)*sizeof(*layer->bitmap_instack);
 	}
 	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8, "[Done] alloc address\n");
 
-	const info_memory mem_used_init;
-	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+5, &mem_used_init);
-	u32 begin = (u32)mem_used_init.begin;
-	u32 end = (u32)(u32)mem_used_init.end;
-	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8,
-		"mem_used_init: %p:%p\n", begin, end);
+	/*
 	// Since the memory will be allocated for buddy system below,
 	// the record for initially used memory will be meaningless.
 	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_VALIDITY,
 		MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+5, false);
+	*/
 	DEBUG_BREAKPOINT;
 	
-	/*
 	// Manually allocate memory for the buddy system
 	// because the memory management is not available yet
-	for(u32 i=(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_KERNEL+0x100000);i<(u32)address;i+=4096)
+	// [Assumption] mem_used_init.end is aligned to pages
+	u32 offset_layer = (u32)(address - ADDR_HIGH_MEMORY);
+	byte *paddr_pageTable = (byte*)align((usize)address, PAGE_BITWIDTH);
+	for(u32 offset=(u32)mem_used_init.end-ADDR_LOW_MEMORY; offset<offset_layer; offset+=PAGE_SIZE)
 	{
-		u32 *const addr_PTE_kernel = &pageTable_kernel[((ADDR_STACK-4096)>>PAGE_BITWIDTH)&1023];
-		u32 *const addr_PTE_init = &pageTable_init[((u32)addr_PTE_kernel>>PAGE_BITWIDTH)&1023];
+		u32 *const addr_PDE = &pageDirectory[(offset+ADDR_HIGH_MEMORY)>>PAGE_BITWIDTH>>PGTBL_BITWIDTH];
+		u32 *const addr_PTE_kernel = &pageTable_kernel[offset>>PAGE_BITWIDTH];
+		u32 *const addr_PTE_init = &pageTable_init[((u32)addr_PTE_kernel>>PAGE_BITWIDTH)&PGTBL_MASK];
 
-		// Mapping the page table entry
-		if(!(*addr_PTE_init&PTE_P))
+		if(!(*addr_PDE&PDE_P))
 		{
-			*addr_PTE_init = (ADDR_LOW_MEMORY+offset_available)|PTE_P|PTE_R;
-			offset_available += 4096;
-			kmemset((byte*)((usize)addr_PTE_kernel&~4095u),0,4096);
+			*addr_PDE = (u32)paddr_pageTable|PDE_P|PDE_R;
+			KASSERT(!(*addr_PTE_init&PTE_P));
+			*addr_PTE_init = (u32)paddr_pageTable|PTE_P|PTE_R;
+			paddr_pageTable += PAGE_SIZE;
+			kmemset((void*)((usize)addr_PTE_kernel&~PAGE_MASK), 0, PAGE_SIZE);
 		}
-
-		pageDirectory[(ADDR_STACK-4096)>>22] = ((*addr_PTE_init)&~4095u)|PDE_P|PDE_R;
-		*addr_PTE_kernel = (ADDR_LOW_MEMORY+offset_available)|PTE_P|PTE_R;
-		offset_available += 4096;
+		*addr_PTE_kernel = (ADDR_LOW_MEMORY+offset)|PTE_P|PTE_R;
 	}
-	*/
 
 	for(u32 i=0;i<cnt_mem_total;++i)
 	{
@@ -142,6 +147,16 @@ usize init_buddySystem()
 	return 0;
 }
 
+void *buddySystem_allocate()
+{
+
+}
+
+void *buddySystem_free()
+{
+
+}
+
 static usize module_init()
 {
 	/*
@@ -149,7 +164,7 @@ static usize module_init()
 			get memory information
 			set interrupt entry
 	*/
-	init_buddySystem();
+	buddySystem_init();
 	return 0;
 }
 
