@@ -2,6 +2,7 @@
 #define _ASSERT_H
 
 #include "base.h"
+#include "macro.h"
 #include "print.h"
 
 #ifdef NDEBUG

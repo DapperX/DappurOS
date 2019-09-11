@@ -53,4 +53,13 @@ static inline usize bit_lowest(const usize x)
 	return (usize)__builtin_ctz(x);
 }
 
+static inline usize cnt_bit(const usize x)
+{
+#ifdef ARCH_X86
+	return (usize)__builtin_popcount(x);
+#else
+	#error cnt_bit is not fully implemented yet.
+#endif
+}
+
 #endif //_MATH_H

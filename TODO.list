@@ -1,6 +1,18 @@
+Divide get_memory_used_init -> get_memory_used + get_addr_used
+Modify `layer_add`: >>3 -> generic case
+Forbid allocating physical frame in address NULL
+
+Transfer the bitmap from PintOS
+Dynamically link the library to the modules
+Improve the makefile: let it generate the temporary files in one specific folder
+
 add support for FPU
 add the description of the status when jumping from `init`
 add more cmd parameters for nasm
 add the support for `.bss` segment for init loading
 fix all makefiles about lib path
 fix `end` field in `mem_info` may exceeds the range of u32
+compare the efficiency of
+	- d = x/y, r = x%y
+	- d = x/y, r = x - d*y
+	for improve the performance of bitmap operations

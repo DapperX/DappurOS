@@ -5,6 +5,7 @@
 #include "math.h"
 #include "debug.h"
 #include "init_mem.h"
+#include "bitmap.h"
 
 static kernelCall callList[];
 
@@ -16,8 +17,8 @@ u32 *const pageTable_kernel = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_KERNEL);
 struct mm_layer{
 	u32 stack_top;
 	u32 *stack;
-	usize *bitmap_present;
-	usize *bitmap_instack;
+	u32 *bitmap_present;
+	u32 *bitmap_instack;
 };
 static struct mm_layer list_layer[CNT_LAYER];
 
@@ -33,18 +34,18 @@ void TLB_invalidate_page(u32 *pgdir, u32 *vaddr)
 	arch_invalidate_page(vaddr);
 }
 
-u32 layer_add(const u32 index, u32 page_begin, u32 cnt)
+u32 layer_add(const u32 order, u32 page_begin, u32 cnt)
 {
 	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8,
-		"[mm] layer_add %u %p %u\n",index,page_begin,cnt);
+		"[mm] layer_add %u %p %u\n",order,page_begin,cnt);
 
-	struct mm_layer *layer = &list_layer[index];
+	struct mm_layer *layer = &list_layer[order];
 	while(cnt--)
 	{
 		layer->stack[layer->stack_top++] = page_begin<<PAGE_BITWIDTH;
-		layer->bitmap_present[page_begin>>index>>3] |= 1u<<((page_begin>>index)&7);
-		layer->bitmap_instack[page_begin>>index>>3] |= 1u<<((page_begin>>index)&7);
-		page_begin += 1u<<index;
+		layer->bitmap_present[page_begin>>order>>3] |= 1u<<((page_begin>>order)&7);
+		layer->bitmap_instack[page_begin>>order>>3] |= 1u<<((page_begin>>order)&7);
+		page_begin += 1u<<order;
 	}
 	return page_begin;
 }
@@ -147,14 +148,52 @@ usize buddySystem_init()
 	return 0;
 }
 
-void *buddySystem_allocate()
+/*
+	Allocate a continuous physical memory area in size of `cnt_frame`*PAGE_SIZE
+	and return the physical address of the area (aligned to PAGE_SIZE)
+	If the allocation fails, it returns NULL.
+	Notice that NULL is never possible as a result of physical frame allocation.
+*/
+void *buddySystem_allocate(u32 cnt_frame)
 {
+	u32 cnt_frame_aligned = log2i(cnt_frame);
+	if(cnt_frame_aligned<cnt_frame) cnt_frame_aligned<<=1;
+	// Detect the overflow
+	KASSERT(cnt_frame_aligned>=cnt_frame);
 
+	u32 order = bit_lowest(cnt_frame_aligned);
+	if(order>CNT_LAYER-1)
+	{
+		order = CNT_LAYER-1;
+		u32 cnt_block = cnt_frame_aligned>>order;
+		// Unimplemented
+		// Search continuous ones in bitmap
+	}
+	else
+	{
+		struct mm_layer *layer = &list_layer[order];
+		/*
+		struct mm_layer{
+			u32 stack_top;
+			u32 *stack;
+			usize *bitmap_present;
+			usize *bitmap_instack;
+		};
+		*/
+		while(layer->stack_top>0)
+		{
+			u32 paddr = layer->stack[layer->stack_top-1];
+			//if(layer->bitmap_present[paddr>>order])
+		}
+	}
 }
 
-void *buddySystem_free()
+/*
+	Return the result whether the operation is successful.
+	Zero means the success while otherwise means the error number.
+*/
+bool buddySystem_free(u32 paddr, u32 cnt_frame)
 {
-
 }
 
 static usize module_init()

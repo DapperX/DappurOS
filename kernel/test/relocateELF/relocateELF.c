@@ -16,7 +16,7 @@ int main()
 	fread(buffer,1,SIZE_BUFFER,elf);
 	fclose(elf);
 
-//	elf_init_LMA(buffer);
+	elf_init_LMA(buffer);
 	elf_relocate(buffer);
 
 	puts("done");

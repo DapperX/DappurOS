@@ -1,9 +1,7 @@
 #ifndef _BASE_H
 #define _BASE_H
 
-#ifndef NULL
-#define NULL ((void*)0)
-#endif
+#include "arch/x86/basic.h"
 
 // `a` must be an array (CANNOT be a pointer)
 #define LEN_ARRAY(a) (sizeof(a)/sizeof(*(a)))
