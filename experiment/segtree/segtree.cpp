@@ -22,9 +22,9 @@ void seg_update(int k)
 		t[l].left, max(max(t[l].mid, t[r].mid),t[l].right+t[r].left), 
 		t[r].right, UNDEF
 	};
-	const int clen = 1<<(log2i(n_aligned)-log2i(k)-1);
-	if(t[k].left==clen) t[k].left += t[r].left;
-	if(t[k].right==clen) t[k].right += t[l].right;
+	const int len = 1<<(log2i(n_aligned)-log2i(k)-1);
+	if(t[k].left==len) t[k].left += t[r].left;
+	if(t[k].right==len) t[k].right += t[l].right;
 }
 
 void seg_down(const int pos, const int terminator)
@@ -33,14 +33,13 @@ void seg_down(const int pos, const int terminator)
 		width && t[k].overwrite!=terminator;
 		k=k<<1|(pos>>--width)&1)
 	{
-		if(t[k].overwrite==UNDEF) continue;
-		if(t[k].overwrite==1)
+		auto &overwrite = t[k].overwrite;
+		if(overwrite!=UNDEF)
 		{
-			const int clen = (1<<width)>>1;
-			t[k<<1] = t[k<<1|1] = (segtree){clen, clen, clen, 1};
+			const int len = (overwrite<<width)>>1;
+			t[k<<1] = t[k<<1|1] = (segtree){len, len, len, overwrite};
+			overwrite = UNDEF;
 		}
-		else t[k<<1] = t[k<<1|1] = (segtree){0, 0, 0, 0};
-		t[k].overwrite = UNDEF;
 	}
 }
 
@@ -52,82 +51,66 @@ void seg_modify_range(int begin, int end, const int value)
 	// pass down the mark to `begin`
 	seg_down(begin, value);
 	t[begin] = (segtree){value, value, value, UNDEF};
-	if(begin==end) goto single;
 	// pass down the mark to `end`
-	seg_down(end, value);
-	t[end] = (segtree){value, value, value, UNDEF};
+	if(begin!=end)
+	{
+		seg_down(end, value);
+		t[end] = (segtree){value, value, value, UNDEF};
+	}
 
 	// update upwards
-	for(; begin^end^1; begin>>=1,end>>=1)
+	for(int len=value; (begin^end)>1; begin>>=1,end>>=1, len<<=1)
 	{
-		const int clen = 1<<(log2i(n_aligned)-log2i(begin));
-		if(!(begin&1)) t[begin^1]=value?(segtree){clen,clen,clen,1}:(segtree){0,0,0,0};
+		if(!(begin&1)) t[begin^1] = (segtree){len, len, len, value};
 		if(t[begin>>1].overwrite==UNDEF) seg_update(begin>>1);
-		if(end&1) t[end^1]=value?(segtree){clen,clen,clen,1}:(segtree){0,0,0,0};
+		if(end&1) t[end^1] = (segtree){len, len, len, value};
 		if(t[end>>1].overwrite==UNDEF) seg_update(end>>1);
 	}
-single:
 	for(auto k=begin>>1; k; k>>=1)
 		if(t[k].overwrite==UNDEF) seg_update(k);
 }
 
-int seg_get_max(int begin_, int end_) // get the maximum contiguous area in range [begin, end)
+int seg_get_max(int begin, int end) // get the maximum contiguous area in range [begin, end)
 {
-	int begin=begin_+n_aligned;
-	int end=end_+n_aligned-1;
+	int l = begin+n_aligned;
+	int r = end+n_aligned-1;
 
-	int bmans=t[begin].mid, emans=t[end].mid;
+	int bmans=t[l].mid, emans=t[r].mid;
 	int brans=bmans, elans=emans;
-	if(begin==end) goto single;
-	for(int width=0; begin^end^1; begin>>=1,end>>=1, ++width)
+	
+	for(int len=1, mask=n_aligned-1;;
+		l>>=1,r>>=1,len<<=1,mask>>=1)
 	{
-		const int stop_now = (1<<width)*(1+(begin&((n_aligned>>width)-1)));
-		const int stop_ext = (1<<width)*(1+((begin|1)&((n_aligned>>width)-1)));
-		// const int clamp_begin = stop - begin_;
-		if(t[begin].overwrite==1)
-		{
-			bmans = brans = min(t[begin].mid, stop_now-begin_);
-		}
-		else if(t[begin].overwrite==0) bmans = brans = 0;
+		int end_this = len*(1+(l&mask));
+		if(t[l].overwrite!=UNDEF)
+			bmans = brans = min(t[l].mid, end_this-begin);
+		int begin_this = len*(r&mask);
+		if(t[r].overwrite!=UNDEF)
+			emans = elans = min(t[r].mid, end-begin_this);
 
-		if(!(begin&1))
-		{
-			bmans = max(bmans, max(t[begin^1].mid, brans+t[begin^1].left));
-			if(bmans>stop_ext-begin_) bmans = stop_ext-begin_;
-			if(t[begin^1].right==1<<width) brans += t[begin^1].right;
-			else brans = t[begin^1].right;
-			// if(brans==1<<width) brans += t[begin].right;
-		}
+		if((l^r)<=1) break;
 
-		const int start_now = (1<<width)*(end&((n_aligned>>width)-1));
-		const int start_ext = (1<<width)*(end&~1u&((n_aligned>>width)-1));
-		// const int clamp_end = end_ - start;
-		if(t[end].overwrite==1)
+		if(!(l&1))
 		{
-			emans = elans = min(t[end].mid, end_-start_now);
+			end_this+=len, l^=1;
+			int x = min(end_this-begin, max(t[l].mid, brans+t[l].left));
+			if(x>bmans) bmans = x;
+			if(t[l].right==len) brans += t[l].right;
+			else brans = t[l].right;
 		}
-		else if(t[end].overwrite==0) emans = elans = 0;
-
-		if(end&1)
+		if(r&1)
 		{
-			emans = max(emans, max(t[end^1].mid, t[end^1].right+elans));
-			if(emans>end_-start_ext) emans = end_-start_ext;
-			if(t[end^1].left==1<<width) elans += t[end^1].left;
-			else elans = t[end^1].left;
-			// if(elans==1<<width) elans += t[end].left;
+			begin_this-=len, r^=1;
+			int x = min(end-begin_this, max(t[r].mid, t[r].right+elans));
+			if(x>emans) emans = x;
+			if(t[r].left==len) elans += t[r].left;
+			else elans = t[r].left;
 		}
 	}
-single:
-	int width = log2i(n_aligned)-log2i(end);
-	int mid = (1<<width)*(end&((n_aligned>>width)-1));
-	if(t[begin].overwrite!=UNDEF)
-		bmans = brans = min(mid-begin_, t[begin].mid);
-	if(t[end].overwrite!=UNDEF)
-		elans = emans = min(end_-mid, t[end].mid);
 	int ans = max(max(bmans, emans), brans+elans);
-	for(auto k=begin>>1; k; k>>=1)
+	for(auto k=l>>1; k; k>>=1)
 		if(t[k].overwrite!=UNDEF) ans = t[k].mid;
-	return min(ans, end_-begin_);
+	return min(ans, end-begin);
 }
 
 void output_segtree()
