@@ -70,44 +70,64 @@ void seg_modify_range(int begin, int end, const int value)
 		if(t[k].overwrite==UNDEF) seg_update(k);
 }
 
+// Return the starting point of a field which fits the given `length`
+int get_position_overall(int target)
+{
+	int begin = 0;
+	for(int k=1, len=n_aligned;; len>>=1)
+	{
+		auto &tk=t[k], &tl=t[k<<1], &tr=t[k<<1|1];
+
+		if(tk.left>=target) return begin;
+		if(tk.right>=target) return begin+len-tk.right;
+
+		if(tl.mid>=target) k = k<<1;
+		else if(tl.right+tr.left>=target) return begin+len/2-tl.right;
+		else if(tr.mid>=target) k = k<<1|1, begin += len>>1;
+		else return -1;
+	}
+	// return tk.mid==target?k:-1;
+	return -1;
+}
+
 int seg_get_max(int begin, int end) // get the maximum contiguous area in range [begin, end)
 {
 	int l = begin+n_aligned;
 	int r = end+n_aligned-1;
 
-	int bmans=t[l].mid, emans=t[r].mid;
-	int brans=bmans, elans=emans;
+	int lmans=t[l].mid, rmans=t[r].mid;
+	int lrans=lmans, rlans=rmans;
 	
 	for(int len=1, mask=n_aligned-1;;
 		l>>=1,r>>=1,len<<=1,mask>>=1)
 	{
 		int end_this = len*(1+(l&mask));
 		if(t[l].overwrite!=UNDEF)
-			bmans = brans = min(t[l].mid, end_this-begin);
+			lmans = lrans = min(t[l].mid, end_this-begin);
 		int begin_this = len*(r&mask);
 		if(t[r].overwrite!=UNDEF)
-			emans = elans = min(t[r].mid, end-begin_this);
+			rmans = rlans = min(t[r].mid, end-begin_this);
 
 		if((l^r)<=1) break;
 
 		if(!(l&1))
 		{
 			end_this+=len, l^=1;
-			int x = min(end_this-begin, max(t[l].mid, brans+t[l].left));
-			if(x>bmans) bmans = x;
-			if(t[l].right==len) brans += t[l].right;
-			else brans = t[l].right;
+			int x = min(end_this-begin, max(t[l].mid, lrans+t[l].left));
+			if(x>lmans) lmans = x;
+			if(t[l].right==len) lrans += t[l].right;
+			else lrans = t[l].right;
 		}
 		if(r&1)
 		{
 			begin_this-=len, r^=1;
-			int x = min(end-begin_this, max(t[r].mid, t[r].right+elans));
-			if(x>emans) emans = x;
-			if(t[r].left==len) elans += t[r].left;
-			else elans = t[r].left;
+			int x = min(end-begin_this, max(t[r].mid, t[r].right+rlans));
+			if(x>rmans) rmans = x;
+			if(t[r].left==len) rlans += t[r].left;
+			else rlans = t[r].left;
 		}
 	}
-	int ans = max(max(bmans, emans), brans+elans);
+	int ans = max(max(lmans, rmans), lrans+rlans);
 	for(auto k=l>>1; k; k>>=1)
 		if(t[k].overwrite!=UNDEF) ans = t[k].mid;
 	return min(ans, end-begin);
@@ -171,5 +191,8 @@ int main()
 		fprintf(stderr, "--- after #%d query ---\n", i);
 		output_segtree();
 	}
+	int ans = get_position_overall(t[1].mid);
+	if(ans==-1) puts("Fail");
+	else printf("%d\n", ans);
 	return 0;
 }

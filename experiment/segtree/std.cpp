@@ -21,6 +21,22 @@ int get_max(int begin, int end)
 	return max(now, ans);
 }
 
+int get_position_overall(int target, int n)
+{
+	if(target==0) return 0;
+	int i = 0;
+	while(i<n)
+	{
+		while(i<n && !a[i]) i++;
+		int j = i;
+		while(j<n && a[j]) j++;
+		if(j-i>=target) return i;
+		i = j;
+	}
+	// return target?-1:0;
+	return -1;
+}
+
 int main()
 {
 	// freopen("t.in", "r", stdin);
@@ -47,5 +63,8 @@ int main()
 		scanf("%d%d", &begin, &end);
 		printf("%d\n", get_max(begin, end));
 	}
+	int ans = get_position_overall(get_max(0, n), n);
+	if(ans==-1) puts("Fail");
+	else printf("%d\n", ans);
 	return 0;
 }
