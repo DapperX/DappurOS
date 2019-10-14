@@ -1,8 +1,6 @@
 #ifndef _MATH_H
 #define _MATH_H
 
-#include "assert.h"
-
 #define LOG2_1 0
 #define LOG2_2 1
 #define LOG2_4 2
@@ -40,7 +38,11 @@
 
 static inline usize log2i(const usize x)
 {
+#ifdef ARCH_X86
 	return sizeof(x)*8-1-(usize)__builtin_clz(x);
+#else
+	#error `log2i` is not fully implemented yet.
+#endif
 }
 
 static inline usize div_ceil(const usize x, const usize y)
@@ -50,7 +52,11 @@ static inline usize div_ceil(const usize x, const usize y)
 
 static inline usize bit_lowest(const usize x)
 {
+#ifdef ARCH_X86
 	return (usize)__builtin_ctz(x);
+#else
+	#error `bit_lowest` is not fully implemented yet.
+#endif
 }
 
 static inline usize cnt_bit(const usize x)
@@ -58,7 +64,7 @@ static inline usize cnt_bit(const usize x)
 #ifdef ARCH_X86
 	return (usize)__builtin_popcount(x);
 #else
-	#error cnt_bit is not fully implemented yet.
+	#error `cnt_bit` is not fully implemented yet.
 #endif
 }
 

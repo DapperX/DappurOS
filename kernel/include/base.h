@@ -1,7 +1,9 @@
 #ifndef _BASE_H
 #define _BASE_H
 
-#include "arch/x86/basic.h"
+#ifdef ARCH_X86
+	#include "arch/x86/basic.h"
+#endif
 
 // `a` must be an array (CANNOT be a pointer)
 #define LEN_ARRAY(a) (sizeof(a)/sizeof(*(a)))

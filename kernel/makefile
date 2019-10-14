@@ -17,6 +17,10 @@ ifeq ($(MODE),nodebug)
 	CFLAG += -DNDEBUG
 endif
 
+ifndef ARCH
+	ARCH = X86
+endif
+CFLAG += -DARCH_$(ARCH)
 
 BIN_EXT = init
 MOD_EXCLUDE = $(BIN_EXT) bin include lib tool test
