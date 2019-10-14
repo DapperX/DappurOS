@@ -4,6 +4,8 @@
 #include "base.h"
 #include "kernel.h"
 
+#define PADDR_ERR ((void*)~(usize)0)
+
 static usize module_init();
 static usize module_exit();
 

@@ -13,14 +13,21 @@ u32 *const pageDirectory = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_DIRECTORY);
 u32 *const pageTable_init = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_INIT);
 u32 *const pageTable_kernel = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_KERNEL);
 
-#define CNT_LAYER 11
+#define MAX_ORDER 10
 struct mm_layer{
-	u32 stack_top;
+	u32 stack_size;
 	u32 *stack;
-	u32 *bitmap_present;
-	u32 *bitmap_instack;
+	bitmap_item *present;
+	bitmap_item *instack;
 };
-static struct mm_layer list_layer[CNT_LAYER];
+static struct mm_layer list_layer[MAX_ORDER+1];
+/*
+	Memory Management Block (MMB)
+	The collection of memory information on a node
+*/
+struct mmb_t{
+	
+};
 
 // upper align `val` to multiple of 2**`bit`
 static inline usize align(usize val, u32 bit)
@@ -34,20 +41,55 @@ void TLB_invalidate_page(u32 *pgdir, u32 *vaddr)
 	arch_invalidate_page(vaddr);
 }
 
-u32 layer_add(const u32 order, u32 page_begin, u32 cnt)
+u32 add_layer(const u32 order, u32 page_begin, u32 cnt)
 {
 	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8,
-		"[mm] layer_add %u %p %u\n",order,page_begin,cnt);
+		"[mm] add_layer %u %p %u\n",order,page_begin,cnt);
 
 	struct mm_layer *layer = &list_layer[order];
 	while(cnt--)
 	{
-		layer->stack[layer->stack_top++] = page_begin<<PAGE_BITWIDTH;
-		layer->bitmap_present[page_begin>>order>>3] |= 1u<<((page_begin>>order)&7);
-		layer->bitmap_instack[page_begin>>order>>3] |= 1u<<((page_begin>>order)&7);
+		layer->stack[layer->stack_size++] = page_begin<<PAGE_BITWIDTH;
+		layer->present[page_begin>>order>>3] |= 1u<<((page_begin>>order)&7);
+		layer->instack[page_begin>>order>>3] |= 1u<<((page_begin>>order)&7);
 		page_begin += 1u<<order;
 	}
 	return page_begin;
+}
+
+// Return whether `index` is new in `layer`
+bool layer_insert(mm_layer *const layer, u32 index)
+{
+	if(bitmap_get_value(layer->present, index)) return false;
+	bitmap_set(layer->present, index);
+	if(!bitmap_get_value(layer->instack, index))
+	{
+		stack_push(layer->address, index);
+		bitmap_set(layer->instack, index);
+	}
+	return true;
+}
+
+// Label `index` within `layer` as erased
+// The actual deletion will happened later in `layer_pop`
+// Return whether `index` exists in `layer`
+bool layer_erase(mm_layer *const layer, u32 index)
+{
+	if(!bitmap_get_value(layer->present), index) return false;
+	return bitmap_clear(layer->present, index), true;
+}
+
+// Return the index of an available area within `layer`
+// If the `layer` is empty, it returns PADDR_ERR instead
+u32 layer_pop(mm_layer *const layer)
+{
+	while(!stack_empty(layer->address))
+	{
+		u32 index = stack_pop(layer->address);
+		bitmap_clear(layer->instack, index);
+		if(layer_erase(layer, index)) return index;
+	}
+	return PADDR_ERR;
 }
 
 usize buddySystem_init()
@@ -67,19 +109,19 @@ usize buddySystem_init()
 	// Settle pointers in the layer
 	// [Assumption] The memory area following the used ones is available.
 	byte *address = (byte*)mem_used_init.end-ADDR_LOW_MEMORY+ADDR_HIGH_MEMORY;
-	for(u32 i=0;i<CNT_LAYER;++i)
+	for(u32 i=0; i<=MAX_ORDER; ++i)
 	{
 		struct mm_layer *layer = &list_layer[i];
-		layer->stack_top = 0;
+		layer->stack_size = 0;
 		address = (byte*)align((usize)address, log2i(sizeof(*layer->stack)));
 		layer->stack = (void*)address;
 		address += (cnt_page_total>>i)*sizeof(*layer->stack);
-		address = (byte*)align((usize)address, log2i(sizeof(*layer->bitmap_present)));
-		layer->bitmap_present = (void*)address;
-		address += div_ceil(cnt_page_total>>i, sizeof(*layer->bitmap_present)*8)*sizeof(*layer->bitmap_present);
-		address = (byte*)align((usize)address, log2i(sizeof(*layer->bitmap_instack)));
-		layer->bitmap_instack = (void*)address;
-		address += div_ceil(cnt_page_total>>i, sizeof(*layer->bitmap_instack)*8)*sizeof(*layer->bitmap_instack);
+		address = (byte*)align((usize)address, log2i(sizeof(*layer->present)));
+		layer->present = (void*)address;
+		address += div_ceil(cnt_page_total>>i, sizeof(*layer->present)*8)*sizeof(*layer->present);
+		address = (byte*)align((usize)address, log2i(sizeof(*layer->instack)));
+		layer->instack = (void*)address;
+		address += div_ceil(cnt_page_total>>i, sizeof(*layer->instack)*8)*sizeof(*layer->instack);
 	}
 	KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8, "[Done] alloc address\n");
 
@@ -121,18 +163,18 @@ usize buddySystem_init()
 		KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8,
 			"%u:%u\n",page_begin,page_end);
 
-		// Align `page_begin` to some bound (at most up to 4K*2^CNT_LAYER = 4M)
-		while(page_begin<page_end && (page_begin&((1u<<(CNT_LAYER-1))-1)))
+		// Align `page_begin` to some bound (at most up to 4K*2^MAX_ORDER = 4M)
+		while(page_begin<page_end && (page_begin&((1u<<(MAX_ORDER))-1)))
 		{
 			u32 lowbit = (u32)bit_lowest(page_begin);
 			if(page_begin+(1u<<lowbit)>page_end) break;
-			page_begin = layer_add(lowbit,page_begin,1);
+			page_begin = add_layer(lowbit,page_begin,1);
 		}
 
 		// Handle the 4M pages
 		u32 cnt_page = page_end-page_begin;
-		page_begin = layer_add(CNT_LAYER-1,page_begin,cnt_page>>(CNT_LAYER-1));
-		cnt_page &= ((1u<<(CNT_LAYER-1))-1);
+		page_begin = add_layer(MAX_ORDER,page_begin,cnt_page>>(MAX_ORDER));
+		cnt_page &= ((1u<<(MAX_ORDER))-1);
 
 		KCALL(MODULE_TYPE_CONTROL, KERNEL_CALL_SELF_DEFINED+8,
 				"%u %p\n",cnt_page,page_begin<<PAGE_BITWIDTH);
@@ -141,7 +183,7 @@ usize buddySystem_init()
 		while(cnt_page)
 		{
 			u32 highbit = (u32)log2i(cnt_page);
-			page_begin = layer_add(highbit,page_begin,1);
+			page_begin = add_layer(highbit,page_begin,1);
 			cnt_page -= 1u<<highbit;
 		}
 	}
@@ -151,49 +193,56 @@ usize buddySystem_init()
 /*
 	Allocate a continuous physical memory area in size of `cnt_frame`*PAGE_SIZE
 	and return the physical address of the area (aligned to PAGE_SIZE)
-	If the allocation fails, it returns NULL.
-	Notice that NULL is never possible as a result of physical frame allocation.
+	If the allocation fails, it returns PADDR_ERR.
+	Notice that PADDR_ERR is never possible as a result of physical frame allocation.
 */
-void *buddySystem_allocate(u32 cnt_frame)
+void* buddySystem_allocate(u32 order)
 {
-	u32 cnt_frame_aligned = log2i(cnt_frame);
-	if(cnt_frame_aligned<cnt_frame) cnt_frame_aligned<<=1;
-	// Detect the overflow
-	KASSERT(cnt_frame_aligned>=cnt_frame);
-
-	u32 order = bit_lowest(cnt_frame_aligned);
-	if(order>CNT_LAYER-1)
+	if(order>=MAX_ORDER)
 	{
-		order = CNT_LAYER-1;
-		u32 cnt_block = cnt_frame_aligned>>order;
+		// order = MAX_ORDER;
+		// u32 cnt_block = cnt_frame_aligned>>order;
 		// Unimplemented
-		// Search continuous ones in bitmap
+		// Search continuous fields in segment tree
+		return PADDR_ERR;
 	}
-	else
+
+	// Find a layer which at least contains a area not deleted
+	u32 order_ex = order, paddr = PADDR_ERR;
+	for(; order_ex<=MAX_ORDER; ++order_ex)
 	{
-		struct mm_layer *layer = &list_layer[order];
-		/*
-		struct mm_layer{
-			u32 stack_top;
-			u32 *stack;
-			usize *bitmap_present;
-			usize *bitmap_instack;
-		};
-		*/
-		while(layer->stack_top>0)
-		{
-			u32 paddr = layer->stack[layer->stack_top-1];
-			//if(layer->bitmap_present[paddr>>order])
-		}
+		// Get the target phsyical address
+		paddr = layer_pop(&list_layer[order_ex]);
+		if(paddr!=PADDR_ERR) break;
 	}
+	// There is no area matching the given size of frames
+	if(paddr==PADDR_ERR) return PADDR_ERR;
+
+	// Replenish the rest of area to the lower layers
+	for(u32 i=order_ex; i>order; --i)
+	{
+		paddr <<= 1;
+		KASSERT(layer_insert(&list_layer[i-1], paddr^1));
+	}
+	return paddr<<order;
 }
 
-/*
-	Return the result whether the operation is successful.
-	Zero means the success while otherwise means the error number.
-*/
-bool buddySystem_free(u32 paddr, u32 cnt_frame)
+void buddySystem_free(u32 paddr, u32 order)
 {
+	if(order>=MAX_ORDER)
+	{
+		// Unimplemented
+	}
+
+	u32 order = bit_lowest(cnt_frame_aligned);
+	for(; order<MAX_ORDER; ++order, paddr>>=1)
+	{
+		struct mm_layer *const layer = &list_layer[order];
+		KASSERT(!bitmap_get_value(layer->present, paddr));
+		if(!layer_erase(layer, paddr^1)) break;
+	}
+
+	KASSERT(layer_insert(&list_layer[order], paddr));
 }
 
 static usize module_init()
