@@ -1,6 +1,7 @@
 #include "bitmap.h"
 #include "math.h"
 #include "arch/x86/atomic.h"
+#include "assert.h"
 
 #define BITS_PER_ITEM (sizeof(bitmap_item)*BITS_PER_BYTE)
 
