@@ -5,7 +5,7 @@
 #include "bitmap.h"
 #include "stack.h"
 
-#define MAX_ORDER 4
+#define MAX_ORDER 10
 struct mm_layer{
 	struct stack address;
 	bitmap_item *present;
@@ -14,7 +14,7 @@ struct mm_layer{
 
 // expose inner functions for testing or debugging
 #ifndef NDEBUG
-extern struct mm_layer list_layer[MAX_ORDER+1];
+extern struct mm_layer list_layer[MAX_ORDER];
 
 usize module_init();
 usize module_exit();

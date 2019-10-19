@@ -14,4 +14,4 @@ all : $(DIR_BIN)/mm.mod
 $(DIR_BIN)/mm.mod : $(DEPEND)
 
 $(DIR_BIN)/mm.mod : $(OBJ) linker.ld
-	$(LD) $^ $(LDFLAG) -Tlinker.ld -o $@
+	$(LD) $(OBJ) $(LDFLAG) -Tlinker.ld -o $@
