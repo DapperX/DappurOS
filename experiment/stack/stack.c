@@ -1,13 +1,12 @@
 #include "stdio.h"
 #include "stack.h"
 
-int pool[100];
+char pool[128];
 
 int main()
 {
 	struct stack a;
-	a.size = 0;
-	a.data = pool;
+	stack_init(&a, pool); 
 	stack_push(&a, 1, int);
 	int y = 5;
 	stack_push(&a, y, int);

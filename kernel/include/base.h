@@ -10,9 +10,9 @@
 
 #define DISABLE(x) (void)(x);
 
-#define true 1
-#define false 0
 typedef char bool;
+#define true ((bool)1)
+#define false ((bool)0)
 typedef unsigned char byte;
 // typedef unsigned short int ushort;
 // typedef unsigned int uint;

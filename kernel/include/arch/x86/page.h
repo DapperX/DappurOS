@@ -1,6 +1,8 @@
 #ifndef _ARCH_PAGE_H
 #define _ARCH_PAGE_H 1
 
+#include "basic.h"
+
 #define PAGE_BITWIDTH 12
 #define PAGE_SIZE (1u<<PAGE_BITWIDTH)
 #define PAGE_MASK (PAGE_SIZE-1)
@@ -50,7 +52,7 @@
 // Available. If set, it indicates the entry has used in special way(e.g. IO mapping) and cannot be modified
 #define RPE_A (1<<1)
 
-static inline void arch_invalidate_page(u32 *vaddr)
+static inline void arch_invalidate_page(msize *vaddr)
 {
 	asm volatile(
 		"invlpg	(%0)\n\t"

@@ -1,4 +1,8 @@
 TESTMOD = $(patsubst ./%,%,$(shell find . -mindepth 1 -maxdepth 1 -type d))
+ifneq ($(MODE), nodebug)
+	CFLAG += -g
+endif
+CFLAG += -DEXTEST
 
 .PHONY : all update
 
@@ -7,7 +11,7 @@ all : dependence.makefile
 
 update : dependence.makefile
 
-dependence.makefile :
+dependence.makefile : $(TESTMOD:%=%/dependence.inc)
 	python gen_dependence.py > $@
 
 sinclude dependence.makefile

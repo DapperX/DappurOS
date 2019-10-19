@@ -1,12 +1,14 @@
-#include "mm.h"
 #include "arch/x86/page.h"
 #include "memory.h"
 #include "assert.h"
 #include "math.h"
 #include "debug.h"
 #include "init_mem.h"
-#include "bitmap.h"
-#include "stack.h"
+#include "mm.private.h"
+
+KCALL_DISPATCH usize module_kernelCall(u32 funct);
+u32 module_kernelCall_index = MODULE_TYPE_MM;
+kCall_dispatch module_kernelCall_entry = module_kernelCall;
 
 static kernelCall callList[];
 
@@ -14,13 +16,7 @@ u32 *const pageDirectory = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_DIRECTORY);
 u32 *const pageTable_init = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_INIT);
 u32 *const pageTable_kernel = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_KERNEL);
 
-#define MAX_ORDER 10
-struct mm_layer{
-	struct stack address;
-	bitmap_item *present;
-	bitmap_item *instack;
-};
-static struct mm_layer list_layer[MAX_ORDER+1];
+struct mm_layer list_layer[MAX_ORDER+1]={0};
 /*
 	Memory Management Block (MMB)
 	The collection of memory information on a node
@@ -225,8 +221,11 @@ msize buddySystem_allocate(u32 order)
 	return paddr<<order;
 }
 
-void buddySystem_free(u32 paddr, u32 order)
+void buddySystem_free(msize paddr, u32 order)
 {
+	// Make sure the given `paddr` is available
+	KASSERT(!(paddr&((1u<<order)-1)));
+	paddr >>= order;
 	if(order>=MAX_ORDER)
 	{
 		// Unimplemented
@@ -242,7 +241,7 @@ void buddySystem_free(u32 paddr, u32 order)
 	KASSERT(layer_insert(&list_layer[order], paddr));
 }
 
-static usize module_init()
+usize module_init()
 {
 	/*
 		TODO:
@@ -253,7 +252,7 @@ static usize module_init()
 	return 0;
 }
 
-static usize module_exit()
+usize module_exit()
 {
 	return 0;
 }

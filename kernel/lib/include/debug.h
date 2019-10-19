@@ -4,7 +4,7 @@
 #include "base.h"
 #include "print.h"
 
-#define HALT {asm volatile("hlt");}
+#define HALT do{asm volatile("hlt");}while(0)
 
 #ifdef NDEBUG
 #define DEBUG_WRAP(content) /\
