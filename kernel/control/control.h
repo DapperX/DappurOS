@@ -7,7 +7,7 @@
 static usize module_init();
 static usize module_exit();
 static usize kernelCall_validity(const u32 index, const u32 funct, const bool enable);
-static usize load_module(char *moduleName);
+static usize load_module(const char *moduleName);
 static usize unload_module(u32 moduleId);
 static usize get_memory_total(const info_memory **const p);
 static usize get_memory_used_init(info_memory *const p);

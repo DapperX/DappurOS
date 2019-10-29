@@ -5,8 +5,14 @@
 #include "assert.h"
 #include "debug.h"
 #include "arch/x86/page.h"
+#include "arch/x86/gate.h"
 #include "kernel.h"
 #include "init_mem.h"
+#include "interrupt.h"
+#include "timer.h"
+
+#define SEL_KERNEL_CODE 0x08
+#define SEL_KERNEL_DATA 0x10
 
 u32 *const pageDirectory = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_DIRECTORY);
 kCall_dispatch *const kernelCallTable = (kCall_dispatch*)(ADDR_HIGH_MEMORY+OFFSET_KCT);
@@ -24,7 +30,7 @@ static inline u32 align(u32 val,u32 bit)
 	return (val+mask)&(~mask);
 }
 
-usize load_module(char *moduleName)
+usize load_module(const char *moduleName)
 {
 	DISABLE(moduleName);
 	return 0;
@@ -56,7 +62,13 @@ u32 alloc_raw(u32 offset_available, u32 vaddr)
 	return offset_available;
 }
 
-void fix_page()
+static void fix_GDT(void)
+{
+	u64 gdtr = (7*8-1)|((u64)(ADDR_HIGH_MEMORY+OFFSET_GDT)<<16);
+	asm volatile ("lgdt %0": : "m"(gdtr));
+}
+
+static void fix_page(void)
 {
 	u32 *const pageTable_init = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_INIT);
 	u32 *const pageTable_kernel = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_KERNEL);
@@ -94,7 +106,7 @@ u32 init_stack(u32 offset_available)
 	asm volatile(
 		"addl %0, %%esp\n\t"
 		"addl %0, %%ebp\n\t"
-	::
+	: :
 		"i"(ADDR_STACK-(ADDR_HIGH_MEMORY+OFFSET_GDT))
 	:
 		"esp"
@@ -105,13 +117,11 @@ u32 init_stack(u32 offset_available)
 	return offset_available;
 }
 
-static void init_IDT()
+static void handler_intr_default(struct intr_frame frame)
 {
-	kmemset((byte*)(ADDR_HIGH_MEMORY+OFFSET_IDT), 0, 2048);
-}
-
-static void init_clock()
-{
+	DEBUG_BREAKPOINT;
+	kprintf("PC: %u:%p\n", (u32)frame.cs, frame.eip);
+	asm volatile("leave\n\tiret");
 }
 
 usize kernelcall_dummy()
@@ -172,12 +182,13 @@ usize module_init(info_header* bootInfo)
 	}
 	kprintf("offset_available: %u\n",offset_available);
 
+	fix_GDT();
 	fix_page();
 	offset_available = init_stack(offset_available);
-	init_IDT();
-	init_clock();
-
 	mem_used_init = (info_memory){ADDR_LOW_MEMORY+OFFSET_MAPPING, ADDR_LOW_MEMORY+offset_available};
+
+	kprintf("handler: %p\n", (u32)handler_intr_default);
+	intr_init(CNT_INTR, gen_gate_int(GATE_TYPE_INT_386, 0, SEL_KERNEL_CODE, (u32)handler_intr_default));
 
 	kputs("Ready to init loaded modules");
 	DEBUG_BREAKPOINT;
@@ -190,16 +201,24 @@ usize module_init(info_header* bootInfo)
 	}
 
 	kprintf("Done");
-	HALT;
+//	HALT;
 
 	// Disable the functions only used for initializing loaded modules
 	callList[KERNEL_CALL_SELF_DEFINED+4] = (kernelCall)kernelcall_dummy;
 	callList[KERNEL_CALL_SELF_DEFINED+5] = (kernelCall)kernelcall_dummy;
 
+/*
 	for(u32 i=0;i<LEN_ARRAY(module_need_load);++i)
 	{
 		load_module(module_need_load[i]);
 	}
+*/
+
+	PIC_init();
+	timer_set(TIMER_FREQUENCY);
+	DEBUG_BREAKPOINT;
+	asm volatile("sti");
+	for(;;);
 	return 0;
 }
 

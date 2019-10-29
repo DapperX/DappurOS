@@ -16,7 +16,7 @@
 #define COUNT_PARM(...) \
 	MACRO_WRAP(COUNT_PARM_(__VA_ARGS__, 8, 7, 6, 5, 4, 3, 2, 1, 0))
 
-#define JMP_INPLACE(target) {\
+#define JMP_INPLACE(target) do{\
 	asm volatile(\
 	/* recover `esp` and `ebp` */\
 		"leave\n\t"\
@@ -26,6 +26,22 @@
 	:\
 		"esp","memory"\
 	);\
-}
+}while(0)
+
+#define NESTFUNC_BEGIN(func_name) do{ \
+	asm volatile("jmp" STR(func_name) "_inner_exit"); \
+	asm volatile( \
+		".func" STR(func_name) "\n\t" \
+		STR(func_name) ":\n\t" \
+	); \
+}while(0)
+
+#define NESTFUNC_END(func_name) do{ \
+	asm volatile(".endfunc"); \
+	asm volatile(STR(func_name) "_inner_exit:"); \
+}while(0)
+
+#define NESTFUNC_GET_ADDR(func_name, addr) \
+	asm volatile("movl $" STR(func_name) ", %0": "=g"(addr));
 
 #endif //_MACRO_H
