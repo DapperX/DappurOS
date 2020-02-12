@@ -46,6 +46,6 @@ void intr_init(u16 cnt, struct gate_t entry)
 	KASSERT(sizeof(entry)==sizeof(u64));
 	for(u16 i=0; i<cnt; ++i)
 		IDT[i] = entry;
-	u64 idtr = (u64)(cnt-1)|(((u64)(u32)IDT)<<16);
+	u64 idtr = (u64)(cnt*sizeof(struct gate_t)-1)|(((u64)(u32)IDT)<<16);
 	asm volatile ("lidt %0": : "m"(idtr));
 }
