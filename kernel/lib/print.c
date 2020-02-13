@@ -7,11 +7,13 @@ static i32 offset_column=0;
 inline void write_video(i32 pos,char c,char color)
 {
 	asm volatile(
-		"movb	%1, %%gs:(%0)\n\t"
-		"movb	%2, %%gs:1(%0)\n\t"
+		// "movb	%1, %%gs:(%0)\n\t"
+		"movb	%1, (%0)\n\t"
+		// "movb	%1, %%gs:(%0)\n\t"
+		"movb	%2, 1(%0)\n\t"
 	:
 	:
-		"r"(pos),"r"(c),"r"(color)
+		"r"(pos+0xb8000),"r"(c),"r"(color)
 	:
 		"memory"
 	);

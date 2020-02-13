@@ -10,11 +10,11 @@ extern LMA_LDT
 GdtBegin:
 GdtNull:		DESCRIPOR_MAKE	0, 0, 0
 GdtKernelCode:	DESCRIPOR_MAKE	0, 0xffffffff, DA_32 | DA_C | DA_DPL_0 | DA_G
-GdtKernelData:	DESCRIPOR_MAKE	0, 0xffffffff, DA_32 | DA_DRWA | DA_DPL_0 | DA_G
+GdtKernelData:	DESCRIPOR_MAKE	0, 0xffffffff, DA_32 | DA_DRW | DA_DPL_0 | DA_G
 GdtUserCode:	DESCRIPOR_MAKE	0, 0xffffffff, DA_32 | DA_C | DA_DPL_3 | DA_G
-GdtUserData:	DESCRIPOR_MAKE	0, 0xffffffff, DA_32 | DA_DRWA | DA_DPL_3 | DA_G
+GdtUserData:	DESCRIPOR_MAKE	0, 0xffffffff, DA_32 | DA_DRW | DA_DPL_3 | DA_G
 GdtLdt:			DESCRIPOR_MAKE	0, LEN_LDT -1, DA_LDT
-GdtVideo:		DESCRIPOR_MAKE	ADDR_VIDEO, 0x0ffff, DA_16 | DA_DRW | DA_DPL_3
+GdtVideo:		DESCRIPOR_MAKE	ADDR_VIDEO, 0x0ffff, DA_32 | DA_DRW | DA_DPL_0
 %rep 9
 	DESCRIPOR_MAKE	0, 0, 0
 %endrep
@@ -31,7 +31,7 @@ SEL_GDT_VIDEO		equ GdtVideo - GdtBegin
 ; LDT
 LdtBegin:
 LdtUserCode:	DESCRIPOR_MAKE	0, 0xffffffff, DA_32 | DA_C | DA_DPL_3
-LdtUserData:	DESCRIPOR_MAKE	0, 0xffffffff, DA_32 | DA_DRWA | DA_DPL_3
+LdtUserData:	DESCRIPOR_MAKE	0, 0xffffffff, DA_32 | DA_DRW | DA_DPL_3
 
 LEN_LDT	equ	$ - LdtBegin
 

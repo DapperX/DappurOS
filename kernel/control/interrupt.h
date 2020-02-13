@@ -19,7 +19,14 @@ enum intr_status
 	INTR_ON
 };
 
-struct intr_frame
+struct intr_frame_intraPriv
+{
+	u32 eip;
+	u16 cs, :16;
+	u32 eflags;
+};
+
+struct intr_frame_interPriv
 {
 	u32 eip;
 	u16 cs, :16;
@@ -36,6 +43,7 @@ enum intr_status intr_disable(void);
 
 void PIC_init(void);
 void PIC_set_mask(u16 mask);
+void PIC_send_EOI();
 void intr_init(u16 cnt, struct gate_t entry);
 
 #endif //_INTERRUPT_H

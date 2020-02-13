@@ -44,4 +44,11 @@
 #define NESTFUNC_GET_ADDR(func_name, addr) \
 	asm volatile("movl $" STR(func_name) ", %0": "=g"(addr));
 
+
+#define STRUCT_FROM_OFFSET(ADDR, STRUCT, OFFSET) \
+	((STRUCT*)((u8*)(ADDR)-(usize)(OFFSET)))
+
+#define STRUCT_FROM_MEMBER(ADDR, STRUCT, MEMBER) \
+	STRUCT_FROM_OFFSET(ADDR, STRUCT, &((STRUCT*)0)->MEMBER)
+
 #endif //_MACRO_H

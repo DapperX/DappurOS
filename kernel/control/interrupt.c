@@ -41,6 +41,16 @@ void PIC_set_mask(u16 mask)
 	io_out_b(PORT_PIC1_DATA, (u8)(mask>>8)), io_delay();
 }
 
+void PIC_send_EOI()
+{
+	// Acknowledge master PIC. 
+	io_out_b(0x20, 0x20);
+/*
+	// Acknowledge slave PIC. 
+	if(irq>=0x28) io_out_b(0xa0, 0x20);
+*/
+}
+
 void intr_init(u16 cnt, struct gate_t entry)
 {
 	KASSERT(sizeof(entry)==sizeof(u64));

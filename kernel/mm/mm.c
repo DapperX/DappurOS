@@ -138,7 +138,7 @@ usize buddySystem_init()
 	// because the memory management is not available yet
 	// [Assumption] mem_used_init.end is aligned to pages
 	u32 offset_used = (u32)(address - ADDR_HIGH_MEMORY);
-	byte *paddr_pageTable = (byte*)align((usize)address, PAGE_BITWIDTH);
+	byte *paddr_pageTable = (byte*)align((usize)address-ADDR_HIGH_MEMORY, PAGE_BITWIDTH);
 	for(u32 offset=(u32)mem_used_init.end-ADDR_LOW_MEMORY; offset<offset_used; offset+=PAGE_SIZE)
 	{
 		u32 *const addr_PDE = &pageDirectory[(offset+ADDR_HIGH_MEMORY)>>PAGE_BITWIDTH>>PGTBL_BITWIDTH];
@@ -153,7 +153,7 @@ usize buddySystem_init()
 			paddr_pageTable += PAGE_SIZE;
 			kmemset((void*)((usize)addr_PTE_kernel&~PAGE_MASK), 0, PAGE_SIZE);
 		}
-		*addr_PTE_kernel = (ADDR_LOW_MEMORY+offset)|PTE_P|PTE_R;
+		*addr_PTE_kernel = (0x100000+offset)|PTE_P|PTE_R;
 	}
 
 	for(u32 i=0;i<cnt_mem_total;++i)

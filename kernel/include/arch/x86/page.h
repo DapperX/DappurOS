@@ -64,4 +64,14 @@ static inline void arch_invalidate_page(msize *vaddr)
 	);
 }
 
+static inline void arch_invalidate_page_all()
+{
+	asm volatile(
+		"movl %%cr3, %%eax\n\t"
+		"movl %%eax, %%cr3\n\t"
+	: : :
+		"memory", "eax"
+	);
+}
+
 #endif // _ARCH_PAGE_H

@@ -52,12 +52,12 @@ u32 alloc_raw(u32 offset_available, u32 vaddr)
 	// Mapping the page for the new page table first
 	if(!(*addr_PTE_init&PTE_P))
 	{
-		*addr_PTE_init = (ADDR_LOW_MEMORY+offset_available)|PTE_P|PTE_R;
+		*addr_PTE_init = (0x100000+offset_available)|PTE_P|PTE_R;
+		pageDirectory[vaddr>>22] = ((*addr_PTE_init)&~4095u)|PDE_P|PDE_R;
 		offset_available += 4096;
 		kmemset((byte*)((usize)addr_PTE_kernel&~4095u),0,4096);
 	}
-	pageDirectory[vaddr>>22] = ((*addr_PTE_init)&~4095u)|PDE_P|PDE_R;
-	*addr_PTE_kernel = (ADDR_LOW_MEMORY+offset_available)|PTE_P|PTE_R;
+	*addr_PTE_kernel = (0x100000+offset_available)|PTE_P|PTE_R;
 	offset_available += 4096;
 	return offset_available;
 }
@@ -73,6 +73,34 @@ static void fix_page(void)
 	u32 *const pageTable_init = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_INIT);
 	u32 *const pageTable_kernel = (u32*)(ADDR_HIGH_MEMORY+OFFSET_PAGE_TABLE_KERNEL);
 
+	// kprintf("pd[0 ]=%p  pd[ 1]=%p\n", pageDirectory[0], pageDirectory[1]);
+	// u32 pdk = ADDR_HIGH_MEMORY>>22;
+	// kprintf("pd[k ]=%p  pd[k1]=%p\n", pageDirectory[pdk], pageDirectory[pdk+1]);
+
+	// kprintf("ptbl_init=%p\n", pageTable_init);
+	// kprintf("ptbl_kernel=%p\n", pageTable_kernel);
+	// DEBUG_BREAKPOINT;
+/*
+	u32 *pte = (u32*)(pageDirectory[0]+ADDR_HIGH_MEMORY);
+	kprintf("pd[0]pte=%p\n", pte);
+	DEBUG_BREAKPOINT;
+	for(u32 i=0; i<1024; ++i)
+	{
+		kprintf("pd[0]pte[%u]=%p\n", i, pte[i]);
+		if(!(pte[i]&PTE_P)) break;
+	}
+	DEBUG_BREAKPOINT;
+
+	pte = (u32*)(pageDirectory[pdk]+ADDR_HIGH_MEMORY);
+	kprintf("pd[k]pte=%p\n", pte);
+	DEBUG_BREAKPOINT;
+	for(u32 i=0; i<1024; ++i)
+	{
+		kprintf("pd[k]pte[%u]=%p\n", i, pte[i]);
+		if(!(pte[i]&PTE_P)) break;
+	}
+	DEBUG_BREAKPOINT;
+*/
 	// Clear the temporary page mapping (low memory areas)
 	pageDirectory[0] = 0;
 	// Clear the initial reserved area #1
@@ -80,6 +108,13 @@ static void fix_page(void)
 	// Merge the init page table into the kernel page table
 	pageTable_init[((u32)&pageTable_kernel[0]>>12)&1023]
 		= pageTable_init[((u32)pageTable_init>>12)&1023];
+
+	return;
+	u32 pd;
+	asm volatile ("movl %%cr3, %0" : "=r"(pd));
+	kprintf("* pd: %p\n", pd);
+	DEBUG_BREAKPOINT;
+	asm volatile ("movl %0, %%cr3" : : "r"(pd) : "memory");
 }
 
 u32 init_stack(u32 offset_available)
@@ -117,11 +152,19 @@ u32 init_stack(u32 offset_available)
 	return offset_available;
 }
 
-static void handler_intr_default(struct intr_frame frame)
+static void handler_intr_default(u32 arg)
 {
 	DEBUG_BREAKPOINT;
-	kprintf("PC: %u:%p\n", (u32)frame.cs, frame.eip);
+	// Set the offset of caller.EIP as it is both an argument and the return address
+	struct intr_frame_intraPriv *frame=STRUCT_FROM_OFFSET(&arg, struct intr_frame_intraPriv, 4);
+	kprintf("PC: %u:%p\n", (u32)frame->cs, frame->eip);
+	PIC_send_EOI();
 	asm volatile("leave\n\tiret");
+}
+
+static void handler_intr_default_errCode(u32 arg)
+{
+
 }
 
 usize kernelcall_dummy()
@@ -181,6 +224,7 @@ usize module_init(info_header* bootInfo)
 		HALT;
 	}
 	kprintf("offset_available: %u\n",offset_available);
+	offset_available += 0x1000;
 
 	fix_GDT();
 	fix_page();
@@ -200,7 +244,7 @@ usize module_init(info_header* bootInfo)
 		KCALL(module_preload[i], KERNEL_CALL_INIT);
 	}
 
-	kprintf("Done");
+	kputs("Done");
 //	HALT;
 
 	// Disable the functions only used for initializing loaded modules
